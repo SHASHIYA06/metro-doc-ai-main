@@ -1,0 +1,31 @@
+# Render configuration for KMRCL Backend
+# This file can be used for Infrastructure as Code deployment
+
+services:
+  - type: web
+    name: kmrcl-backend
+    env: node
+    plan: free  # Change to 'starter' or higher for production
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: FRONTEND_URL
+        value: https://kmrcl-metro-intelligence.netlify.app
+      - key: GEMINI_API_KEY
+        sync: false  # This should be set manually in Render dashboard
+      
+    # Auto-deploy settings
+    autoDeploy: true
+    
+    # Resource limits (adjust based on your plan)
+    disk:
+      name: data
+      mountPath: /app/uploads
+      sizeGB: 1
