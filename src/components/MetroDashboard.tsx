@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { apiService } from '../services/api';
 import { googleDriveService } from '../services/googleDrive';
 import { exportService } from '../services/exportService';
+import { aiAnalysisService, AnalysisResult, SearchType } from '../services/aiAnalysis';
 import { Enhanced3DBackground } from './Enhanced3DBackground';
 import { StatusIndicator } from './StatusIndicator';
 import { config } from '../config/environment';
@@ -73,6 +74,7 @@ export const MetroDashboard: React.FC = () => {
   const [folderPath, setFolderPath] = useState('');
   const [totalIndexed, setTotalIndexed] = useState(0);
   const [backendStats, setBackendStats] = useState<BackendStats | null>(null);
+  const [searchType, setSearchType] = useState<SearchType>('ai');
 
   // Check connections on component mount
   useEffect(() => {
@@ -132,31 +134,61 @@ export const MetroDashboard: React.FC = () => {
 
   const loadDriveFolders = async () => {
     try {
-      const folders = await googleDriveService.listFolders();
+      console.log('Loading Google Drive folders...');
+      const folders = await googleDriveService.loadTree();
       setDriveFolders(folders);
+      console.log('Folders loaded:', folders.length);
+      
+      if (folders.length > 0) {
+        toast.success(`Loaded ${folders.length} folders from Google Drive`);
+      } else {
+        toast.info('No folders found in Google Drive');
+      }
     } catch (error) {
       console.error('Failed to load Drive folders:', error);
       toast.error('Failed to load Google Drive folders');
+      setDriveFolders([]); // Clear folders on error
     }
   };
 
-  const loadDriveFiles = async (folderId: string = currentFolderId) => {
+  const loadDriveFiles = async (folderId: string = '') => {
     try {
       setLoading(true);
-      const files = await googleDriveService.listFiles(folderId);
+      console.log('Loading files for folder:', folderId || 'root');
+      
+      const files = await googleDriveService.loadFiles(folderId);
       setDriveFiles(files);
-      toast.success(`Loaded ${files.length} files from Google Drive`);
+      
+      if (files.length > 0) {
+        toast.success(`Loaded ${files.length} files from Google Drive`);
+      } else {
+        toast.info('No files found in this folder');
+      }
     } catch (error) {
       console.error('Failed to load Drive files:', error);
       toast.error('Failed to load files from Google Drive');
+      setDriveFiles([]); // Clear files on error
     } finally {
       setLoading(false);
     }
   };
 
   const navigateToFolder = (folderId: string, folderName: string) => {
+    console.log('Navigating to folder:', folderName, 'ID:', folderId);
     setCurrentFolderId(folderId);
-    setFolderHistory(prev => [...prev, {id: folderId, name: folderName}]);
+    
+    // Update folder history
+    const newHistory = [...folderHistory];
+    // Check if this folder is already in history to avoid duplicates
+    const existingIndex = newHistory.findIndex(f => f.id === folderId);
+    if (existingIndex === -1) {
+      newHistory.push({id: folderId, name: folderName});
+    } else {
+      // If folder exists, truncate history to that point
+      newHistory.splice(existingIndex + 1);
+    }
+    
+    setFolderHistory(newHistory);
     loadDriveFiles(folderId);
   };
 
@@ -208,45 +240,27 @@ export const MetroDashboard: React.FC = () => {
 
     setIsProcessing(true);
     try {
-      const selectedFilesList = driveFiles.filter(f => selectedFiles.has(f.id));
-      toast.info(`Analyzing ${selectedFilesList.length} files from Google Drive...`);
+      const selectedFileIds = Array.from(selectedFiles);
+      const query = searchQuery || 'Analyze these selected documents for technical specifications and details';
+      
+      toast.info(`Analyzing ${selectedFileIds.length} files from Google Drive...`);
 
-      // Download file contents from Google Drive
-      const filesWithContent = await Promise.all(
-        selectedFilesList.map(async (file) => {
-          try {
-            const content = await googleDriveService.downloadFile(file.id);
-            return {
-              name: file.name,
-              text: content.content || content.contentBase64 || '',
-              meta: file.mimeType
-            };
-          } catch (error) {
-            console.error(`Error downloading ${file.name}:`, error);
-            return {
-              name: file.name,
-              text: `Error downloading file: ${error}`,
-              meta: file.mimeType
-            };
-          }
-        })
+      // Use the new AI analysis service
+      const analysisResult = await aiAnalysisService.analyzeSelectedFiles(
+        selectedFileIds,
+        query,
+        searchType
       );
 
-      // Send to backend for AI analysis
-      const response = await apiService.search(
-        searchQuery || 'Analyze these selected documents for technical specifications and details',
-        { k: 15 }
-      );
-
-      // Convert response to results
-      const convertedResults: SearchResult[] = response.sources.map(source => ({
-        id: source.ref.toString(),
-        title: `${source.fileName} - ${source.system}/${source.subsystem}`,
+      // Convert analysis result to display format
+      const convertedResults: SearchResult[] = analysisResult.sources.map((source, index) => ({
+        id: index.toString(),
+        title: source.fileName,
         content: source.preview,
-        system: source.system,
-        subsystem: source.subsystem,
+        system: 'Google Drive',
+        subsystem: 'Analysis',
         score: source.score,
-        fileType: 'PDF',
+        fileType: 'Analysis',
         preview: source.preview,
         sources: [{
           fileName: source.fileName,
@@ -566,6 +580,29 @@ export const MetroDashboard: React.FC = () => {
                 </button>
               </div>
 
+              {/* Search Type Options */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { id: 'ai', label: 'AI Search', icon: '🧠' },
+                  { id: 'diagram', label: 'Diagram Search', icon: '📊' },
+                  { id: 'architecture', label: 'Architecture', icon: '🏗️' },
+                  { id: 'technical', label: 'Technical', icon: '⚙️' }
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setSearchType(option.id as SearchType)}
+                    className={`p-3 rounded-lg border transition-colors flex items-center gap-2 text-sm ${
+                      searchType === option.id
+                        ? 'bg-blue-600/20 border-blue-400 text-blue-300'
+                        : 'bg-white/5 border-white/10 text-blue-200 hover:bg-white/10'
+                    }`}
+                  >
+                    <span>{option.icon}</span>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="text-blue-200 text-sm">
                 <p>💡 Try asking: "What are the voltage requirements for traction power?" or "Show me signaling system specifications"</p>
               </div>
@@ -623,11 +660,51 @@ export const MetroDashboard: React.FC = () => {
                 </button>
               </div>
 
+              {/* Folders List */}
+              <div className="mb-4">
+                <h4 className="text-white font-medium mb-2">Folders</h4>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  <div
+                    className={`flex items-center gap-3 p-2 rounded-lg border transition-colors cursor-pointer ${
+                      currentFolderId === '' 
+                        ? 'bg-blue-600/20 border-blue-400' 
+                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    }`}
+                    onClick={() => navigateToFolder('', 'Root Folder')}
+                  >
+                    <Folder className="text-yellow-400" size={16} />
+                    <span className="text-white text-sm">🏠 Root Folder</span>
+                  </div>
+                  {driveFolders.map((folder) => (
+                    <div
+                      key={folder.id}
+                      className={`flex items-center gap-3 p-2 rounded-lg border transition-colors cursor-pointer ${
+                        currentFolderId === folder.id
+                          ? 'bg-blue-600/20 border-blue-400'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}
+                      onClick={() => navigateToFolder(folder.id, folder.name)}
+                    >
+                      <Folder className="text-yellow-400" size={16} />
+                      <span className="text-white text-sm flex-1">{folder.name}</span>
+                      <span className="text-blue-300 text-xs bg-blue-600/20 px-2 py-1 rounded">
+                        {folder.count}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* File List */}
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                <h4 className="text-white font-medium mb-2">Files</h4>
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="animate-spin text-blue-400" size={32} />
+                  </div>
+                ) : driveFiles.length === 0 ? (
+                  <div className="text-center py-4 text-blue-200">
+                    No files found in this folder
                   </div>
                 ) : (
                   driveFiles.map((file) => (
@@ -655,7 +732,10 @@ export const MetroDashboard: React.FC = () => {
                         <p className="text-white font-medium">{file.name}</p>
                         {file.size && (
                           <p className="text-blue-200 text-sm">
-                            {Math.round(parseInt(file.size) / 1024)} KB
+                            {typeof file.size === 'number' 
+                              ? `${Math.round(file.size / 1024)} KB`
+                              : `${Math.round(parseInt(file.size.toString()) / 1024)} KB`
+                            }
                           </p>
                         )}
                       </div>
