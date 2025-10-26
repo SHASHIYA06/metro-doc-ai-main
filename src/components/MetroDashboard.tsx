@@ -223,12 +223,20 @@ export const MetroDashboard: React.FC = () => {
     }
 
     try {
-      await googleDriveService.createFolder(folderPath, systemFilter, subsystemFilter);
-      toast.success(`Folder created: ${folderPath}`);
-      setFolderPath('');
-      await loadDriveFolders();
+      console.log('Creating folder:', folderPath);
+      const result = await googleDriveService.createFolder(folderPath, systemFilter, subsystemFilter);
+      
+      if (result.success) {
+        toast.success(`✅ Folder created: ${folderPath}`);
+        setFolderPath('');
+        await loadDriveFolders();
+        await loadDriveFiles(); // Refresh current folder
+      } else {
+        throw new Error(result.error || 'Folder creation failed');
+      }
     } catch (error: any) {
-      toast.error(`Failed to create folder: ${error.message}`);
+      console.error('Folder creation failed:', error);
+      toast.error(`❌ Failed to create folder: ${error.message}`);
     }
   };
 
@@ -442,6 +450,65 @@ export const MetroDashboard: React.FC = () => {
     }
   };
 
+  const handleDirectUploadToDrive = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    if (driveConnectionStatus !== 'connected') {
+      toast.error('Google Drive is not connected. Please check the connection.');
+      return;
+    }
+
+    setIsProcessing(true);
+    const fileArray = Array.from(files);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      toast.info(`Uploading ${fileArray.length} file(s) directly to Google Drive...`);
+
+      for (const file of fileArray) {
+        try {
+          toast.info(`Uploading ${file.name} to Google Drive...`);
+          
+          const driveResult = await googleDriveService.uploadFile(file, systemFilter, subsystemFilter);
+          
+          if (driveResult.success) {
+            successCount++;
+            toast.success(`✅ ${file.name} uploaded to Google Drive`);
+          } else {
+            throw new Error(driveResult.error || 'Upload failed');
+          }
+          
+        } catch (fileError: any) {
+          console.error(`Error uploading ${file.name}:`, fileError);
+          errorCount++;
+          toast.error(`❌ ${file.name}: ${fileError.message}`);
+        }
+      }
+      
+      // Final summary and refresh
+      if (successCount > 0) {
+        toast.success(`🎉 Successfully uploaded ${successCount} file(s) to Google Drive!`);
+        await loadDriveFiles(); // Refresh the file list
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`⚠️ ${errorCount} file(s) failed to upload`);
+      }
+      
+    } catch (error: any) {
+      console.error('Direct upload process failed:', error);
+      toast.error(`Upload process failed: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+      // Clear the input
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
   const exportResults = async (format: 'pdf' | 'word' | 'excel') => {
     if (results.length === 0) {
       toast.error('No results to export');
@@ -463,6 +530,58 @@ export const MetroDashboard: React.FC = () => {
     } catch (error: any) {
       console.error('Export failed:', error);
       toast.error(`Export failed: ${error.message}`);
+    }
+  };
+
+  const downloadResult = async (result: SearchResult) => {
+    try {
+      const content = `KMRCL Metro Intelligence - Search Result
+
+Title: ${result.title}
+System: ${result.system}
+Subsystem: ${result.subsystem}
+Type: ${result.fileType}
+Match Score: ${Math.round(result.score * 100)}%
+
+Content:
+${result.content}
+
+Preview:
+${result.preview}
+
+Sources:
+${result.sources.map(source => `- ${source.fileName} (Position: ${source.position}, Score: ${Math.round(source.score * 100)}%)`).join('\n')}
+
+Generated: ${new Date().toISOString()}
+Query: ${searchQuery}
+`;
+
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `search-result-${result.id}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Result downloaded successfully!');
+    } catch (error: any) {
+      console.error('Download failed:', error);
+      toast.error(`Download failed: ${error.message}`);
+    }
+  };
+
+  const downloadFileFromDrive = async (fileId: string, fileName: string) => {
+    try {
+      toast.info(`Downloading ${fileName}...`);
+      await googleDriveService.downloadFileContent(fileId, fileName);
+      toast.success(`✅ ${fileName} downloaded successfully!`);
+    } catch (error: any) {
+      console.error('Download failed:', error);
+      toast.error(`❌ Download failed: ${error.message}`);
     }
   };
 
@@ -698,7 +817,7 @@ export const MetroDashboard: React.FC = () => {
               </div>
 
               {/* Create Folder */}
-              <div className="flex gap-4">
+              <div className="flex gap-4 mb-4">
                 <input
                   type="text"
                   placeholder="New folder path (e.g., Signaling/CBTC)"
@@ -713,6 +832,42 @@ export const MetroDashboard: React.FC = () => {
                   <Folder size={16} />
                   Create
                 </button>
+              </div>
+
+              {/* Direct Upload to Google Drive */}
+              <div className="mb-4 p-4 bg-blue-600/10 border border-blue-400/20 rounded-lg">
+                <h4 className="text-blue-300 font-medium mb-2">📤 Upload to Google Drive</h4>
+                <div className="flex gap-4">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.png,.jpg,.jpeg"
+                    onChange={handleDirectUploadToDrive}
+                    className="hidden"
+                    id="drive-upload"
+                    disabled={isProcessing}
+                  />
+                  <label
+                    htmlFor="drive-upload"
+                    className={`flex-1 px-4 py-2 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
+                      isProcessing 
+                        ? 'border-gray-400 text-gray-400 cursor-not-allowed' 
+                        : 'border-blue-400 text-blue-300 hover:border-blue-300 hover:bg-blue-400/5'
+                    }`}
+                  >
+                    {isProcessing ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="animate-spin" size={16} />
+                        Uploading...
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <Upload size={16} />
+                        Click to upload files directly to Google Drive
+                      </span>
+                    )}
+                  </label>
+                </div>
               </div>
 
               {/* Folders List */}
@@ -794,9 +949,23 @@ export const MetroDashboard: React.FC = () => {
                           </p>
                         )}
                       </div>
-                      {file.type === 'file' && selectedFiles.has(file.id) && (
-                        <CheckCircle className="text-green-400" size={20} />
-                      )}
+                      <div className="flex items-center gap-2">
+                        {file.type === 'file' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadFileFromDrive(file.id, file.name);
+                            }}
+                            className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            title="Download File"
+                          >
+                            <Download size={16} />
+                          </button>
+                        )}
+                        {file.type === 'file' && selectedFiles.has(file.id) && (
+                          <CheckCircle className="text-green-400" size={20} />
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -864,9 +1033,18 @@ export const MetroDashboard: React.FC = () => {
                     <div key={result.id} className="bg-white/5 rounded-lg p-6 border border-white/10">
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="text-lg font-semibold text-white">{result.title}</h3>
-                        <span className="text-sm text-blue-300 bg-blue-600/20 px-2 py-1 rounded">
-                          {Math.round(result.score * 100)}% match
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-blue-300 bg-blue-600/20 px-2 py-1 rounded">
+                            {Math.round(result.score * 100)}% match
+                          </span>
+                          <button
+                            onClick={() => downloadResult(result)}
+                            className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            title="Download Result"
+                          >
+                            <Download size={16} />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-blue-200 mb-3">{result.preview}</p>
                       <div className="flex gap-4 text-sm text-blue-300">

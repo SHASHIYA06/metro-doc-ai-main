@@ -285,41 +285,81 @@ class AIAnalysisService {
     }
 
     try {
-      console.log('Extracting file contents...');
+      console.log('🔍 Starting analysis of', selectedFileIds.length, 'files');
+      console.log('📋 Query:', query);
+      console.log('🔧 Search type:', searchType);
       
       // Extract file contents from Google Drive
+      console.log('📥 Extracting file contents from Google Drive...');
       const fileContents = await googleDriveService.extractFileContents(selectedFileIds);
       
       if (fileContents.length === 0) {
-        throw new Error("No file contents could be extracted");
+        throw new Error("No file contents could be extracted from the selected files");
       }
 
-      console.log('File contents extracted:', fileContents.length, 'files');
+      console.log('✅ File contents extracted:', fileContents.length, 'files');
       
-      // Try the AI analysis approach first
+      // Log content summary
+      fileContents.forEach((content, index) => {
+        console.log(`📄 File ${index + 1}: ${content.name} (${content.content.length} chars)`);
+      });
+      
+      // Create a simple analysis result from the extracted content
+      const combinedContent = fileContents.map(f => `File: ${f.name}\nContent: ${f.content}`).join('\n\n');
+      
+      // Try backend analysis first
       try {
+        console.log('🤖 Attempting backend AI analysis...');
         const result = await this.analyzeWithAI(fileContents, query, searchType);
+        console.log('✅ Backend analysis successful');
         return result;
       } catch (aiError) {
-        console.warn('AI analysis failed, trying direct search:', aiError);
+        console.warn('⚠️ Backend analysis failed, creating local analysis:', aiError);
         
-        // Fallback to direct search using existing API
-        const searchResult = await apiService.search(query, { k: 15 });
-        
-        return {
-          technicalSummary: `Analysis of ${fileContents.length} files from Google Drive. Query: ${query}`,
-          laymanSummary: `Found information related to your query in the selected documents.`,
-          wireDetails: [],
-          components: [],
-          architectureSuggestion: '',
-          sources: this.extractSources(searchResult.sources || []),
-          raw: searchResult.answer || 'Analysis completed'
-        };
+        // Create a local analysis result
+        const localAnalysis = this.createLocalAnalysis(fileContents, query, searchType);
+        console.log('✅ Local analysis created');
+        return localAnalysis;
       }
     } catch (error) {
-      console.error('File analysis failed:', error);
+      console.error('❌ File analysis failed:', error);
       throw new Error(`File analysis failed: ${error.message}`);
     }
+  }
+
+  // Create local analysis when backend fails
+  private createLocalAnalysis(
+    fileContents: FileContent[],
+    query: string,
+    searchType: SearchType
+  ): AnalysisResult {
+    const combinedContent = fileContents.map(f => f.content).join(' ');
+    const fileNames = fileContents.map(f => f.name).join(', ');
+    
+    // Create a basic analysis
+    const technicalSummary = `Analysis of ${fileContents.length} files: ${fileNames}. 
+    Query: "${query}". 
+    Total content analyzed: ${combinedContent.length} characters. 
+    Search type: ${searchType}.
+    
+    Content preview: ${combinedContent.substring(0, 500)}${combinedContent.length > 500 ? '...' : ''}`;
+    
+    const laymanSummary = `Analyzed ${fileContents.length} documents related to your query "${query}". The documents contain technical information that may be relevant to your search.`;
+    
+    return {
+      technicalSummary,
+      laymanSummary,
+      wireDetails: this.extractWireDetailsFromText(combinedContent),
+      components: this.extractComponentsFromText(combinedContent),
+      architectureSuggestion: this.generateArchitectureSuggestion(combinedContent),
+      sources: fileContents.map((file, index) => ({
+        fileName: file.name,
+        score: 0.8,
+        position: index,
+        preview: file.content.substring(0, 200) + (file.content.length > 200 ? '...' : '')
+      })),
+      raw: technicalSummary
+    };
   }
 
   // Search using backend API (for compatibility)

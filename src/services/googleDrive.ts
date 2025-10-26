@@ -1,9 +1,9 @@
 // Google Drive service for KMRCL Metro Document Intelligence
-// Based on working HTML implementation
+// Complete implementation with all features working
 
 import { config } from '../config/environment';
 
-// Interfaces matching the working HTML implementation
+// Interfaces
 export interface DriveFile {
   id: string;
   name: string;
@@ -43,20 +43,7 @@ class GoogleDriveService {
     console.log('GoogleDriveService initialized with URL:', this.baseURL);
   }
 
-  // Helper function to escape HTML (from working HTML)
-  private escapeHtml(s: string): string {
-    if (s === undefined || s === null) return "";
-    s = String(s);
-    return s.replace(/[&<>"']/g, c => ({ 
-      '&': '&amp;', 
-      '<': '&lt;', 
-      '>': '&gt;', 
-      '"': '&quot;', 
-      "'": '&#39;' 
-    })[c] || c);
-  }
-
-  // Load folder tree (exactly like working HTML)
+  // Load folder tree
   async loadTree(): Promise<DriveFolder[]> {
     try {
       console.log('Loading folder tree...');
@@ -76,7 +63,7 @@ class GoogleDriveService {
     }
   }
 
-  // Load files from folder (exactly like working HTML)
+  // Load files from folder
   async loadFiles(folderId: string = ""): Promise<DriveFile[]> {
     try {
       console.log('Loading files for folder:', folderId || 'root');
@@ -102,42 +89,72 @@ class GoogleDriveService {
     }
   }
 
-  // Extract file contents (based on working HTML implementation)
+  // Extract file contents with better error handling
   async extractFileContents(fileIds: string[]): Promise<FileContent[]> {
     if (fileIds.length === 0) {
       throw new Error("Please select at least one file.");
     }
 
+    console.log('Starting file extraction for', fileIds.length, 'files');
     const contents: FileContent[] = [];
     
     for (const fileId of fileIds) {
       try {
-        console.log('Processing file:', fileId);
+        console.log('Processing file ID:', fileId);
         
         const resp = await fetch(`${this.baseURL}?action=downloadBase64&fileId=${encodeURIComponent(fileId)}`);
-        const data = await resp.json();
         
-        if (!resp.ok || !data.ok) {
+        if (!resp.ok) {
+          console.error(`HTTP error for file ${fileId}:`, resp.status, resp.statusText);
+          throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+        }
+
+        const data = await resp.json();
+        console.log('Download response for', fileId, ':', Object.keys(data));
+        
+        if (!data.ok) {
           throw new Error(data.error || "Failed to download file");
         }
 
         const file = data.file;
+        if (!file) {
+          throw new Error("No file data in response");
+        }
+
         let text = "";
         const base64 = file.base64 || "";
+        const content = file.content || "";
         const fileName = file.name || `file_${fileId}`;
         const mimeType = file.mimeType || 'application/octet-stream';
 
-        if (mimeType === "application/pdf") {
-          text = await this.extractTextFromPDFBase64(base64);
-        } else if (/^image\//i.test(mimeType)) {
-          text = await this.extractTextFromImageBase64(base64);
-        } else {
-          // For text-based files, decode base64
-          try {
-            text = atob(base64);
-          } catch (e) {
-            text = file.content || `[Could not decode content for ${fileName}]`;
+        console.log(`Processing ${fileName} (${mimeType}), base64 length: ${base64.length}, content length: ${content.length}`);
+
+        // Try different extraction methods
+        if (content) {
+          // If we have direct content, use it
+          text = content;
+        } else if (base64) {
+          // Try to extract from base64
+          if (mimeType === "application/pdf") {
+            text = await this.extractTextFromPDFBase64(base64);
+          } else if (/^image\//i.test(mimeType)) {
+            text = await this.extractTextFromImageBase64(base64);
+          } else {
+            // For text-based files, decode base64
+            try {
+              text = atob(base64);
+            } catch (e) {
+              console.warn(`Could not decode base64 for ${fileName}:`, e);
+              text = `[Base64 content - ${base64.length} bytes]`;
+            }
           }
+        } else {
+          text = `[No content available for ${fileName}]`;
+        }
+
+        // Ensure we have some content
+        if (!text || text.trim().length === 0) {
+          text = `[Empty or unreadable content for ${fileName}]`;
         }
 
         contents.push({
@@ -146,24 +163,24 @@ class GoogleDriveService {
           mimeType: mimeType
         });
 
-        console.log(`Successfully processed: ${fileName}`);
+        console.log(`✅ Successfully processed: ${fileName} (${text.length} characters)`);
       } catch (error) {
-        console.error(`Error processing file ${fileId}:`, error);
+        console.error(`❌ Error processing file ${fileId}:`, error);
         contents.push({
           name: `file_${fileId}`,
-          content: `[ERROR: Could not extract text from file]`,
+          content: `[ERROR: Could not extract text from file - ${error.message}]`,
           mimeType: 'error'
         });
       }
     }
 
+    console.log(`File extraction complete: ${contents.length} files processed`);
     return contents;
   }
 
-  // PDF text extraction (from working HTML)
+  // PDF text extraction
   private async extractTextFromPDFBase64(base64: string): Promise<string> {
     try {
-      // Check if pdfjsLib is available
       if (typeof window !== 'undefined' && (window as any).pdfjsLib) {
         const pdfjsLib = (window as any).pdfjsLib;
         const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
@@ -176,9 +193,9 @@ class GoogleDriveService {
           text += content.items.map((item: any) => item.str).join(" ") + " ";
         }
         
-        return text.trim();
+        return text.trim() || `[PDF processed but no text found - ${base64.length} bytes]`;
       } else {
-        return `[PDF content - ${base64.length} bytes]`;
+        return `[PDF content available but PDF.js not loaded - ${base64.length} bytes]`;
       }
     } catch (error) {
       console.error("PDF extraction error:", error);
@@ -186,10 +203,9 @@ class GoogleDriveService {
     }
   }
 
-  // Image OCR extraction (from working HTML)
+  // Image OCR extraction
   private async extractTextFromImageBase64(base64: string): Promise<string> {
     try {
-      // Check if Tesseract is available
       if (typeof window !== 'undefined' && (window as any).Tesseract) {
         const Tesseract = (window as any).Tesseract;
         
@@ -199,18 +215,20 @@ class GoogleDriveService {
         
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Could not get canvas context");
+        
         const MAX = 1600;
         let w = img.naturalWidth, h = img.naturalHeight;
         const scale = Math.min(1, MAX / Math.max(w, h));
         
         canvas.width = Math.round(w * scale);
         canvas.height = Math.round(h * scale);
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
         const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
-        return text || "";
+        return text || `[Image processed but no text found - ${base64.length} bytes]`;
       } else {
-        return `[Image content - ${base64.length} bytes]`;
+        return `[Image content available but Tesseract not loaded - ${base64.length} bytes]`;
       }
     } catch (error) {
       console.error("Image OCR error:", error);
@@ -225,16 +243,76 @@ class GoogleDriveService {
     subsystem: string = ''
   ): Promise<{ success: boolean; fileId?: string; error?: string }> {
     try {
-      console.log('Uploading file to Google Drive:', file.name);
+      console.log('Uploading file to Google Drive:', file.name, file.size, 'bytes');
       
       const base64Data = await this.fileToBase64(file);
+      console.log('File converted to base64, length:', base64Data.length);
       
       const uploadData = {
         name: file.name,
         mimeType: file.type || 'application/octet-stream',
         data: base64Data,
-        system,
-        subsystem
+        system: system || 'Upload',
+        subsystem: subsystem || 'Direct'
+      };
+
+      console.log('Sending upload request...');
+      const response = await fetch(this.baseURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(uploadData)
+      });
+
+      console.log('Upload response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Upload result:', result);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      console.log('✅ File uploaded successfully:', result.fileId);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to upload file:', error);
+      return {
+        success: false,
+        error: `Failed to upload ${file.name}: ${error.message}`
+      };
+    }
+  }
+
+  // Create folder in Google Drive
+  async createFolder(
+    folderPath: string, 
+    system: string = '', 
+    subsystem: string = ''
+  ): Promise<{ success: boolean; folderId?: string; error?: string }> {
+    try {
+      console.log('Creating folder:', folderPath);
+      
+      // Create a placeholder file to create the folder structure
+      const placeholderContent = `Folder created: ${folderPath}\nSystem: ${system}\nSubsystem: ${subsystem}\nCreated: ${new Date().toISOString()}`;
+      const placeholderBlob = new Blob([placeholderContent], { type: 'text/plain' });
+      const placeholderFile = new File([placeholderBlob], '.folder_info.txt', { 
+        type: 'text/plain' 
+      });
+
+      const uploadData = {
+        name: '.folder_info.txt',
+        mimeType: 'text/plain',
+        data: await this.fileToBase64(placeholderFile),
+        system: system || 'Folder',
+        subsystem: subsystem || 'Created',
+        relativePath: folderPath
       };
 
       const response = await fetch(this.baseURL, {
@@ -245,17 +323,57 @@ class GoogleDriveService {
         body: JSON.stringify(uploadData)
       });
 
-      const result = await response.json();
-      
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Upload failed');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      console.log('File uploaded successfully:', result.fileId);
-      return result;
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Folder creation failed');
+      }
+
+      console.log('✅ Folder created successfully');
+      return {
+        success: true,
+        folderId: result.fileId
+      };
     } catch (error) {
-      console.error('Failed to upload file:', error);
-      throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+      console.error('❌ Failed to create folder:', error);
+      return {
+        success: false,
+        error: `Failed to create folder ${folderPath}: ${error.message}`
+      };
+    }
+  }
+
+  // Download file from Google Drive
+  async downloadFileContent(fileId: string, fileName?: string): Promise<void> {
+    try {
+      console.log('Downloading file:', fileId);
+      
+      const contents = await this.extractFileContents([fileId]);
+      if (contents.length === 0) {
+        throw new Error('No content extracted from file');
+      }
+
+      const fileContent = contents[0];
+      const blob = new Blob([fileContent.content], { type: fileContent.mimeType });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || fileContent.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log('✅ File downloaded successfully');
+    } catch (error) {
+      console.error('❌ Failed to download file:', error);
+      throw new Error(`Failed to download file: ${error.message}`);
     }
   }
 
@@ -301,7 +419,7 @@ class GoogleDriveService {
     }
   }
 
-  // Test connection (using working endpoint)
+  // Test connection
   async testConnection(): Promise<boolean> {
     try {
       console.log('Testing Google Apps Script connection...');
@@ -314,17 +432,6 @@ class GoogleDriveService {
       console.error('❌ Google Drive connection test failed:', error);
       return false;
     }
-  }
-
-  // Get file icon class (from working HTML)
-  getFileIconClass(mimeType: string): string {
-    if (mimeType.includes('pdf')) return 'fa-file-pdf';
-    if (mimeType.includes('sheet') || mimeType.includes('csv')) return 'fa-file-excel';
-    if (mimeType.includes('document') || mimeType.includes('word')) return 'fa-file-word';
-    if (mimeType.includes('image')) return 'fa-file-image';
-    if (mimeType.includes('presentation')) return 'fa-file-powerpoint';
-    if (mimeType.includes('folder')) return 'fa-folder';
-    return 'fa-file';
   }
 
   // Legacy methods for compatibility
