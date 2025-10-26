@@ -2,9 +2,11 @@
 
 interface EnvironmentConfig {
   API_BASE_URL: string;
+  APP_SCRIPT_URL: string;
   APP_NAME: string;
   VERSION: string;
   ENVIRONMENT: 'development' | 'production' | 'staging';
+  MAIN_FOLDER_ID: string;
 }
 
 const getEnvironmentConfig = (): EnvironmentConfig => {
@@ -15,14 +17,20 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
     (isDevelopment 
       ? 'http://localhost:3000' 
-      : 'https://kmrcl-backend.onrender.com'
+      : 'https://metro-doc-ai-main.onrender.com'
     );
+
+  // Google Apps Script URL for Drive integration
+  const APP_SCRIPT_URL = import.meta.env.VITE_APP_SCRIPT_URL || 
+    'https://script.google.com/macros/s/AKfycbzq7-DRXeX5dbcCAXfSqDgjubDAWkTiHOMdZ1PLaCdknrPkKfbo5znLvntYN7lICzz_mQ/exec';
 
   return {
     API_BASE_URL,
+    APP_SCRIPT_URL,
     APP_NAME: 'KMRCL Metro Document Intelligence',
     VERSION: '2.0.0',
-    ENVIRONMENT: isDevelopment ? 'development' : 'production'
+    ENVIRONMENT: isDevelopment ? 'development' : 'production',
+    MAIN_FOLDER_ID: '1mjA3OiBaDX1-ins9Myr8QtU8esyyKkTG'
   };
 };
 
@@ -37,6 +45,15 @@ export const API_ENDPOINTS = {
   SEARCH_BY_TAGS: `${config.API_BASE_URL}/search-by-tags`,
   STATS: `${config.API_BASE_URL}/stats`,
   CLEAR: `${config.API_BASE_URL}/clear`
+};
+
+// Google Apps Script endpoints
+export const DRIVE_ENDPOINTS = {
+  LIST_FILES: `${config.APP_SCRIPT_URL}?action=listFiles`,
+  LIST_TREE: `${config.APP_SCRIPT_URL}?action=listTree`,
+  DOWNLOAD_FILE: `${config.APP_SCRIPT_URL}?action=downloadBase64`,
+  UPLOAD_FILE: config.APP_SCRIPT_URL,
+  SEARCH: `${config.APP_SCRIPT_URL}?action=search`
 };
 
 // Console log the configuration in development

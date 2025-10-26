@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { apiService, type SearchResponse, type UploadResponse } from '@/services/api';
+import { googleDriveService, type DriveFile, type DriveFolder } from '@/services/googleDrive';
 import { config } from '@/config/environment';
 import {
   Search,
@@ -34,14 +35,18 @@ import {
   Filter,
   RefreshCw,
   CircuitBoard,
-  Map,
-  Layers,
   Activity,
   TrendingUp,
   Shield,
   Cpu,
   HardDrive,
-  Wifi
+  Wifi,
+  Folder,
+  FolderOpen,
+  ArrowLeft,
+  Plus,
+  CloudUpload,
+  ExternalLink
 } from 'lucide-react';
 
 interface SearchResult {
@@ -83,23 +88,42 @@ interface AnalysisResult {
 }
 
 export const MetroDashboard = () => {
+  // Search and AI states
   const [searchQuery, setSearchQuery] = useState('');
   const [systemFilter, setSystemFilter] = useState('');
   const [subsystemFilter, setSubsystemFilter] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [activeTab, setActiveTab] = useState('ai-search');
-  const [totalIndexed, setTotalIndexed] = useState(0);
+  const [activeTab, setActiveTab] = useState('drive-files');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  
+  // Google Drive states
+  const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
+  const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [currentFolderId, setCurrentFolderId] = useState<string>(config.MAIN_FOLDER_ID);
+  const [folderHistory, setFolderHistory] = useState<{id: string, name: string}[]>([
+    {id: config.MAIN_FOLDER_ID, name: 'Root'}
+  ]);
+  
+  // Upload states
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [folderPath, setFolderPath] = useState('');
+  
+  // Connection states
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [driveConnectionStatus, setDriveConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [backendStats, setBackendStats] = useState<any>(null);
+  const [totalIndexed, setTotalIndexed] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  // Check backend connection on component mount
+  // Check connections on component mount
   useEffect(() => {
     checkBackendConnection();
+    checkDriveConnection();
     loadBackendStats();
+    loadDriveFolders();
+    loadDriveFiles();
   }, []);
 
   const checkBackendConnection = async () => {
@@ -107,16 +131,34 @@ export const MetroDashboard = () => {
       setConnectionStatus('connecting');
       const isConnected = await apiService.testConnection();
       setConnectionStatus(isConnected ? 'connected' : 'error');
-
+      
       if (isConnected) {
-        toast.success(`Connected to backend at ${config.API_BASE_URL}`);
+        toast.success(`Backend connected: ${config.API_BASE_URL}`);
       } else {
         toast.error('Failed to connect to backend');
       }
     } catch (error) {
-      console.error('Connection check failed:', error);
+      console.error('Backend connection failed:', error);
       setConnectionStatus('error');
       toast.error('Backend connection failed');
+    }
+  };
+
+  const checkDriveConnection = async () => {
+    try {
+      setDriveConnectionStatus('connecting');
+      const isConnected = await googleDriveService.testConnection();
+      setDriveConnectionStatus(isConnected ? 'connected' : 'error');
+      
+      if (isConnected) {
+        toast.success('Google Drive connected successfully');
+      } else {
+        toast.error('Failed to connect to Google Drive');
+      }
+    } catch (error) {
+      console.error('Drive connection failed:', error);
+      setDriveConnectionStatus('error');
+      toast.error('Google Drive connection failed');
     }
   };
 
@@ -126,11 +168,68 @@ export const MetroDashboard = () => {
       setBackendStats(stats);
       setTotalIndexed(stats.totalChunks);
     } catch (error) {
-      console.error('Failed to load stats:', error);
+      console.error('Failed to load backend stats:', error);
     }
   };
 
-  // Enhanced file upload with drag & drop
+  const loadDriveFolders = async () => {
+    try {
+      const folders = await googleDriveService.listFolders();
+      setDriveFolders(folders);
+    } catch (error) {
+      console.error('Failed to load Drive folders:', error);
+      toast.error('Failed to load Google Drive folders');
+    }
+  };
+
+  const loadDriveFiles = async (folderId: string = currentFolderId) => {
+    try {
+      setLoading(true);
+      const files = await googleDriveService.listFiles(folderId);
+      setDriveFiles(files);
+      toast.success(`Loaded ${files.length} files from Google Drive`);
+    } catch (error) {
+      console.error('Failed to load Drive files:', error);
+      toast.error('Failed to load files from Google Drive');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Navigate to folder
+  const navigateToFolder = (folderId: string, folderName: string) => {
+    setCurrentFolderId(folderId);
+    setFolderHistory(prev => [...prev, {id: folderId, name: folderName}]);
+    loadDriveFiles(folderId);
+  };
+
+  // Navigate back
+  const navigateBack = () => {
+    if (folderHistory.length <= 1) return;
+    
+    const newHistory = [...folderHistory];
+    newHistory.pop();
+    const previousFolder = newHistory[newHistory.length - 1];
+    
+    setFolderHistory(newHistory);
+    setCurrentFolderId(previousFolder.id);
+    loadDriveFiles(previousFolder.id);
+  };
+
+  // Toggle file selection
+  const toggleFileSelection = (fileId: string) => {
+    setSelectedFiles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(fileId)) {
+        newSet.delete(fileId);
+      } else {
+        newSet.add(fileId);
+      }
+      return newSet;
+    });
+  };
+
+  // Enhanced file upload with Google Drive integration
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const newFiles: UploadedFile[] = acceptedFiles.map(file => ({
       id: Math.random().toString(36).substr(2, 9),
@@ -144,42 +243,55 @@ export const MetroDashboard = () => {
     setUploadedFiles(prev => [...prev, ...newFiles]);
 
     try {
-      // Update progress to show upload starting
+      // Step 1: Upload to Google Drive
+      toast.info('Uploading files to Google Drive...');
+      const driveResults = await googleDriveService.uploadFiles(
+        acceptedFiles, 
+        systemFilter, 
+        subsystemFilter, 
+        folderPath
+      );
+
+      // Update progress for Drive upload
       newFiles.forEach(file => {
-        setUploadedFiles(prev => prev.map(f =>
-          f.id === file.id ? { ...f, progress: 10 } : f
+        setUploadedFiles(prev => prev.map(f => 
+          f.id === file.id ? { ...f, progress: 50, status: 'processing' } : f
         ));
       });
 
-      // Upload to backend
+      // Step 2: Upload to backend for AI processing
+      toast.info('Processing files with AI...');
       const response = await apiService.uploadFiles(acceptedFiles, systemFilter, subsystemFilter);
 
       // Update files to completed status
       newFiles.forEach(file => {
-        setUploadedFiles(prev => prev.map(f =>
+        setUploadedFiles(prev => prev.map(f => 
           f.id === file.id ? { ...f, status: 'completed', progress: 100 } : f
         ));
       });
 
       setTotalIndexed(response.total);
-      toast.success(`Successfully processed ${response.added} chunks from ${acceptedFiles.length} file(s)`);
-
-      // Reload stats
-      await loadBackendStats();
-
+      toast.success(`Successfully uploaded to Drive and processed ${response.added} chunks from ${acceptedFiles.length} file(s)`);
+      
+      // Reload both Drive files and backend stats
+      await Promise.all([
+        loadDriveFiles(),
+        loadBackendStats()
+      ]);
+      
     } catch (error: any) {
       console.error('Upload failed:', error);
-
+      
       // Update files to error status
       newFiles.forEach(file => {
-        setUploadedFiles(prev => prev.map(f =>
+        setUploadedFiles(prev => prev.map(f => 
           f.id === file.id ? { ...f, status: 'error', progress: 0 } : f
         ));
       });
-
+      
       toast.error(`Upload failed: ${error.message}`);
     }
-  }, [systemFilter, subsystemFilter]);
+  }, [systemFilter, subsystemFilter, folderPath]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -194,21 +306,72 @@ export const MetroDashboard = () => {
     multiple: true
   });
 
-  const getConnectionStatusColor = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'text-green-300 border-green-400/50 bg-green-500/10';
-      case 'connecting': return 'text-yellow-300 border-yellow-400/50 bg-yellow-500/10';
-      case 'error': return 'text-red-300 border-red-400/50 bg-red-500/10';
-      default: return 'text-gray-300 border-gray-400/50 bg-gray-500/10';
+  // Analyze selected files from Google Drive
+  const analyzeSelectedFiles = async () => {
+    if (selectedFiles.size === 0) {
+      toast.error('Please select files to analyze');
+      return;
     }
-  };
 
-  const getConnectionStatusText = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'Connected';
-      case 'connecting': return 'Connecting...';
-      case 'error': return 'Disconnected';
-      default: return 'Unknown';
+    setIsProcessing(true);
+    try {
+      const selectedFilesList = driveFiles.filter(f => selectedFiles.has(f.id));
+      toast.info(`Analyzing ${selectedFilesList.length} files from Google Drive...`);
+
+      // Download file contents from Google Drive
+      const filesWithContent = await Promise.all(
+        selectedFilesList.map(async (file) => {
+          try {
+            const content = await googleDriveService.downloadFile(file.id);
+            return {
+              name: file.name,
+              text: content.content || content.contentBase64 || '',
+              meta: file.mimeType
+            };
+          } catch (error) {
+            console.error(`Error downloading ${file.name}:`, error);
+            return {
+              name: file.name,
+              text: `Error downloading file: ${error}`,
+              meta: file.mimeType
+            };
+          }
+        })
+      );
+
+      // Send to backend for AI analysis
+      const response = await apiService.search(
+        searchQuery || 'Analyze these selected documents for technical specifications and details',
+        { k: 15 }
+      );
+
+      // Convert response to results
+      const convertedResults: SearchResult[] = response.sources.map(source => ({
+        id: source.ref.toString(),
+        title: `${source.fileName} - ${source.system}/${source.subsystem}`,
+        content: source.preview,
+        system: source.system,
+        subsystem: source.subsystem,
+        score: source.score,
+        fileType: 'PDF',
+        preview: source.preview,
+        sources: [{
+          fileName: source.fileName,
+          position: source.position,
+          score: source.score,
+          preview: source.preview
+        }]
+      }));
+
+      setResults(convertedResults);
+      setActiveTab('ai-search');
+      toast.success(`Analysis complete! Found ${convertedResults.length} relevant results`);
+
+    } catch (error: any) {
+      console.error('Analysis failed:', error);
+      toast.error(`Analysis failed: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -224,10 +387,10 @@ export const MetroDashboard = () => {
     }
 
     setIsProcessing(true);
-
+    
     try {
       let response: SearchResponse;
-
+      
       switch (type) {
         case 'structured':
           response = await apiService.searchMulti(
@@ -255,7 +418,7 @@ export const MetroDashboard = () => {
         system: source.system,
         subsystem: source.subsystem,
         score: source.score,
-        fileType: 'PDF', // Could be enhanced to detect from fileName
+        fileType: 'PDF',
         preview: source.preview,
         sources: [{
           fileName: source.fileName,
@@ -269,8 +432,8 @@ export const MetroDashboard = () => {
       const analysisFromResponse: AnalysisResult = {
         summary: response.result.substring(0, 300) + '...',
         technical_details: response.result,
-        wire_details: [], // Could be extracted from response
-        components: [], // Could be extracted from response
+        wire_details: [],
+        components: [],
         system_architecture: {
           name: 'Metro System Analysis',
           version: '1.0',
@@ -281,7 +444,7 @@ export const MetroDashboard = () => {
       setResults(convertedResults);
       setAnalysisResult(analysisFromResponse);
       toast.success(`Found ${convertedResults.length} relevant results from ${response.totalIndexed} indexed documents`);
-
+      
     } catch (error: any) {
       console.error('Search failed:', error);
       toast.error(`Search failed: ${error.message}`);
@@ -290,10 +453,45 @@ export const MetroDashboard = () => {
     }
   };
 
+  const createFolder = async () => {
+    if (!folderPath.trim()) {
+      toast.error('Please enter a folder path');
+      return;
+    }
+
+    try {
+      await googleDriveService.createFolder(folderPath, systemFilter, subsystemFilter);
+      toast.success(`Folder created: ${folderPath}`);
+      setFolderPath('');
+      await loadDriveFolders();
+    } catch (error: any) {
+      toast.error(`Failed to create folder: ${error.message}`);
+    }
+  };
+
+  const getConnectionStatusColor = (status: string) => {
+    switch (status) {
+      case 'connected': return 'text-green-300 border-green-400/50 bg-green-500/10';
+      case 'connecting': return 'text-yellow-300 border-yellow-400/50 bg-yellow-500/10';
+      case 'error': return 'text-red-300 border-red-400/50 bg-red-500/10';
+      default: return 'text-gray-300 border-gray-400/50 bg-gray-500/10';
+    }
+  };
+
+  const getConnectionStatusText = (status: string) => {
+    switch (status) {
+      case 'connected': return 'Connected';
+      case 'connecting': return 'Connecting...';
+      case 'error': return 'Disconnected';
+      default: return 'Unknown';
+    }
+  };
+
   const getFileIcon = (type: string) => {
     if (type.includes('pdf')) return <FileText className="h-4 w-4 text-red-400" />;
     if (type.includes('image')) return <FileImage className="h-4 w-4 text-green-400" />;
     if (type.includes('spreadsheet') || type.includes('excel')) return <FileSpreadsheet className="h-4 w-4 text-blue-400" />;
+    if (type.includes('folder')) return <Folder className="h-4 w-4 text-yellow-400" />;
     return <FileText className="h-4 w-4 text-gray-400" />;
   };
 
@@ -310,7 +508,7 @@ export const MetroDashboard = () => {
   return (
     <div className="min-h-screen p-6 space-y-6 relative z-10">
       {/* Enhanced Header with Glass Morphism */}
-      <motion.div
+      <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative"
@@ -319,7 +517,7 @@ export const MetroDashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <motion.div
+                <motion.div 
                   className="p-3 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl backdrop-blur-sm border border-white/10"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -332,34 +530,33 @@ export const MetroDashboard = () => {
                   </h1>
                   <p className="text-blue-200/80 flex items-center space-x-2">
                     <Sparkles className="h-4 w-4" />
-                    <span>Advanced Document Search • OCR • Architecture Analysis • RAG AI</span>
+                    <span>Google Drive • AI Search • OCR • Architecture Analysis</span>
                   </p>
                 </div>
               </div>
               <div className="flex items-center space-x-4">
-                <Badge variant="outline" className={getConnectionStatusColor()}>
-                  <div className={`w-2 h-2 rounded-full mr-2 ${connectionStatus === 'connected' ? 'bg-green-500' :
-                      connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
-                    }`} />
-                  {getConnectionStatusText()}
+                <Badge variant="outline" className={getConnectionStatusColor(connectionStatus)}>
+                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                    connectionStatus === 'connected' ? 'bg-green-500' : 
+                    connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                  }`} />
+                  Backend: {getConnectionStatusText(connectionStatus)}
+                </Badge>
+                <Badge variant="outline" className={getConnectionStatusColor(driveConnectionStatus)}>
+                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                    driveConnectionStatus === 'connected' ? 'bg-green-500' : 
+                    driveConnectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                  }`} />
+                  Drive: {getConnectionStatusText(driveConnectionStatus)}
                 </Badge>
                 <Badge variant="outline" className="text-blue-300 border-blue-400/50 bg-blue-500/10">
                   <Database className="h-3 w-3 mr-1" />
-                  {totalIndexed} Documents Indexed
+                  {totalIndexed} Indexed
                 </Badge>
                 <Badge variant="outline" className="text-cyan-300 border-cyan-400/50 bg-cyan-500/10">
                   <Shield className="h-3 w-3 mr-1" />
-                  Built for SHASHI SHEKHAR MISHRA
+                  SHASHI SHEKHAR MISHRA
                 </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={checkBackendConnection}
-                  className="text-blue-300 border-blue-400/50 hover:bg-blue-500/10"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Refresh
-                </Button>
               </div>
             </div>
           </CardContent>
@@ -380,13 +577,13 @@ export const MetroDashboard = () => {
                 <HardDrive className="h-5 w-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-sm text-blue-200/70">Total Files</p>
-                <p className="text-xl font-bold text-white">{uploadedFiles.length}</p>
+                <p className="text-sm text-blue-200/70">Drive Files</p>
+                <p className="text-xl font-bold text-white">{driveFiles.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-
+        
         <Card className="bg-white/5 backdrop-blur-xl border-white/10">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -394,13 +591,13 @@ export const MetroDashboard = () => {
                 <Activity className="h-5 w-5 text-green-400" />
               </div>
               <div>
-                <p className="text-sm text-blue-200/70">Processed</p>
-                <p className="text-xl font-bold text-white">{uploadedFiles.filter(f => f.status === 'completed').length}</p>
+                <p className="text-sm text-blue-200/70">Selected</p>
+                <p className="text-xl font-bold text-white">{selectedFiles.size}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-
+        
         <Card className="bg-white/5 backdrop-blur-xl border-white/10">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -408,13 +605,13 @@ export const MetroDashboard = () => {
                 <Cpu className="h-5 w-5 text-purple-400" />
               </div>
               <div>
-                <p className="text-sm text-blue-200/70">AI Queries</p>
+                <p className="text-sm text-blue-200/70">AI Results</p>
                 <p className="text-xl font-bold text-white">{results.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-
+        
         <Card className="bg-white/5 backdrop-blur-xl border-white/10">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -430,296 +627,366 @@ export const MetroDashboard = () => {
         </Card>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Enhanced Upload Section */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="bg-white/5 backdrop-blur-xl border-white/10 shadow-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-white">
-                <Upload className="h-5 w-5 text-blue-400" />
-                <span>Document Upload</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <motion.div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-300 ${isDragActive
-                    ? 'border-blue-400 bg-blue-500/10'
-                    : 'border-blue-400/30 hover:border-blue-400/50 hover:bg-blue-500/5'
-                  }`}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <input {...getInputProps()} />
-                <motion.div
-                  animate={isDragActive ? { scale: 1.1 } : { scale: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <FileText className="h-12 w-12 text-blue-400 mx-auto mb-2" />
-                </motion.div>
-                <p className="text-blue-200 mb-2 font-medium">
-                  {isDragActive ? 'Drop files here!' : 'Drop files or click to browse'}
-                </p>
-                <p className="text-sm text-blue-300/70">
-                  PDF, DOCX, XLSX, Images, CSV
-                </p>
-              </motion.div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  placeholder="System"
-                  value={systemFilter}
-                  onChange={(e) => setSystemFilter(e.target.value)}
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
-                />
-                <Input
-                  placeholder="Subsystem"
-                  value={subsystemFilter}
-                  onChange={(e) => setSubsystemFilter(e.target.value)}
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
-
-              {/* File Upload Status */}
-              {uploadedFiles.length > 0 && (
-                <ScrollArea className="h-32 w-full">
-                  <div className="space-y-2">
-                    {uploadedFiles.map((file) => (
-                      <motion.div
-                        key={file.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center space-x-2 p-2 bg-white/5 rounded-lg"
-                      >
-                        {getFileIcon(file.type)}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-white truncate">{file.name}</p>
-                          <Progress value={file.progress} className="h-1 mt-1" />
-                        </div>
-                        {getStatusIcon(file.status)}
-                      </motion.div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Enhanced Search Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-3"
-        >
-          <Card className="bg-white/5 backdrop-blur-xl border-white/10 shadow-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-white">
-                <Brain className="h-5 w-5 text-purple-400" />
-                <span>AI-Powered Search & Analysis</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-4 bg-white/5 backdrop-blur-sm">
-                  <TabsTrigger value="ai-search" className="data-[state=active]:bg-blue-500/20">
-                    <Brain className="h-4 w-4 mr-1" />
-                    AI Search
-                  </TabsTrigger>
-                  <TabsTrigger value="architecture" className="data-[state=active]:bg-purple-500/20">
-                    <Network className="h-4 w-4 mr-1" />
-                    Architecture
-                  </TabsTrigger>
-                  <TabsTrigger value="structured" className="data-[state=active]:bg-orange-500/20">
-                    <BarChart3 className="h-4 w-4 mr-1" />
-                    Structured
-                  </TabsTrigger>
-                  <TabsTrigger value="keyword" className="data-[state=active]:bg-cyan-500/20">
-                    <Filter className="h-4 w-4 mr-1" />
-                    Keyword
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="ai-search" className="space-y-4 mt-6">
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Ask anything about your documents... (e.g., 'Show me door control specifications')"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
-                      onKeyPress={(e) => e.key === 'Enter' && handleSearch('ai')}
-                    />
-                    <Button
-                      onClick={() => handleSearch('ai')}
-                      disabled={isProcessing}
-                      className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
-                    >
-                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-white/20 text-blue-300 hover:bg-blue-500/10"
-                      onClick={() => setSearchQuery('Show me door control unit specifications')}
-                    >
-                      <Zap className="h-3 w-3 mr-1" />
-                      Door Systems
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-white/20 text-blue-300 hover:bg-purple-500/10"
-                      onClick={() => setSearchQuery('Find HVAC system architecture')}
-                    >
-                      <Database className="h-3 w-3 mr-1" />
-                      HVAC Systems
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-white/20 text-blue-300 hover:bg-green-500/10"
-                      onClick={() => setSearchQuery('Show electrical circuit diagrams')}
-                    >
-                      <FileImage className="h-3 w-3 mr-1" />
-                      Circuit Diagrams
-                    </Button>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="architecture" className="space-y-4 mt-6">
-                  <Textarea
-                    placeholder="Describe the circuit, architecture, or technical diagram you're looking for... (e.g., 'Find door control circuit with safety interlocks')"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-white/5 border-white/20 text-white placeholder:text-white/50 min-h-[100px]"
-                  />
-                  <Button
-                    onClick={() => handleSearch('architecture')}
-                    disabled={isProcessing}
-                    className="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
-                  >
-                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Network className="h-4 w-4 mr-2" />}
-                    Search Architecture & Diagrams
-                  </Button>
-                </TabsContent>
-
-                <TabsContent value="structured" className="space-y-4 mt-6">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="System filter (e.g., Rolling Stock)"
-                      value={systemFilter}
-                      onChange={(e) => setSystemFilter(e.target.value)}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
-                    />
-                    <Input
-                      placeholder="Subsystem filter (e.g., Doors)"
-                      value={subsystemFilter}
-                      onChange={(e) => setSubsystemFilter(e.target.value)}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
-                    />
-                  </div>
-                  <Button
-                    onClick={() => handleSearch('structured')}
-                    disabled={isProcessing}
-                    className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                  >
-                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileSpreadsheet className="h-4 w-4 mr-2" />}
-                    Structured Query Search
-                  </Button>
-                </TabsContent>
-
-                <TabsContent value="keyword" className="space-y-4 mt-6">
-                  <Input
-                    placeholder="Enter keywords to search OCR text... (e.g., 'safety interlock', 'maintenance procedure')"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch('keyword')}
-                  />
-                  <Button
-                    onClick={() => handleSearch('keyword')}
-                    disabled={isProcessing}
-                    className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600"
-                  >
-                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
-                    Search OCR Content
-                  </Button>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* Enhanced Results Section */}
+      {/* Main Content Tabs */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.2 }}
       >
         <Card className="bg-white/5 backdrop-blur-xl border-white/10 shadow-2xl">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-white">
-              <div className="flex items-center space-x-2">
-                <Eye className="h-5 w-5 text-green-400" />
-                <span>Search Results & Analysis</span>
-                {results.length > 0 && (
-                  <Badge variant="secondary" className="bg-green-500/20 text-green-300">
-                    {results.length} Results
-                  </Badge>
+          <CardContent className="p-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-5 bg-white/5 backdrop-blur-sm">
+                <TabsTrigger value="drive-files" className="data-[state=active]:bg-blue-500/20">
+                  <Folder className="h-4 w-4 mr-1" />
+                  Google Drive
+                </TabsTrigger>
+                <TabsTrigger value="upload" className="data-[state=active]:bg-green-500/20">
+                  <Upload className="h-4 w-4 mr-1" />
+                  Upload
+                </TabsTrigger>
+                <TabsTrigger value="ai-search" className="data-[state=active]:bg-purple-500/20">
+                  <Brain className="h-4 w-4 mr-1" />
+                  AI Search
+                </TabsTrigger>
+                <TabsTrigger value="analysis" className="data-[state=active]:bg-orange-500/20">
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  Analysis
+                </TabsTrigger>
+                <TabsTrigger value="results" className="data-[state=active]:bg-cyan-500/20">
+                  <Eye className="h-4 w-4 mr-1" />
+                  Results
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Google Drive Files Tab */}
+              <TabsContent value="drive-files" className="space-y-4 mt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={navigateBack}
+                      disabled={folderHistory.length <= 1}
+                      className="border-white/20 text-blue-300"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Back
+                    </Button>
+                    <div className="text-sm text-blue-200">
+                      {folderHistory.map((folder, index) => (
+                        <span key={folder.id}>
+                          {index > 0 && ' / '}
+                          {folder.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedFiles(new Set(driveFiles.map(f => f.id)))}
+                      className="border-white/20 text-blue-300"
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedFiles(new Set())}
+                      className="border-white/20 text-blue-300"
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      onClick={analyzeSelectedFiles}
+                      disabled={selectedFiles.size === 0 || isProcessing}
+                      className="bg-gradient-to-r from-purple-500 to-indigo-500"
+                    >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Brain className="h-4 w-4 mr-2" />}
+                      Analyze Selected ({selectedFiles.size})
+                    </Button>
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                    <span className="ml-2 text-blue-200">Loading files from Google Drive...</span>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[500px] w-full">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {driveFiles.map((file) => (
+                        <motion.div
+                          key={file.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                            selectedFiles.has(file.id)
+                              ? 'bg-blue-500/20 border-blue-400'
+                              : 'bg-white/5 border-white/10 hover:bg-white/10'
+                          }`}
+                          onClick={() => {
+                            if (file.type === 'folder') {
+                              navigateToFolder(file.id, file.name);
+                            } else {
+                              toggleFileSelection(file.id);
+                            }
+                          }}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0">
+                              {getFileIcon(file.mimeType)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-white truncate">{file.name}</h3>
+                              <p className="text-xs text-blue-300/70 mt-1">
+                                {file.type === 'folder' ? 'Folder' : file.mimeType}
+                              </p>
+                              {file.size && file.size !== '0' && (
+                                <p className="text-xs text-blue-300/50">
+                                  {(parseInt(file.size) / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              )}
+                            </div>
+                            {file.type !== 'folder' && (
+                              <div className="flex-shrink-0">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedFiles.has(file.id)}
+                                  onChange={() => toggleFileSelection(file.id)}
+                                  className="rounded"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 )}
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-white/20 text-blue-300 hover:bg-blue-500/10"
+              </TabsContent>
+
+              {/* Upload Tab */}
+              <TabsContent value="upload" className="space-y-4 mt-6">
+                <motion.div
+                  {...getRootProps()}
+                  className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
+                    isDragActive 
+                      ? 'border-blue-400 bg-blue-500/10' 
+                      : 'border-blue-400/30 hover:border-blue-400/50 hover:bg-blue-500/5'
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <Download className="h-3 w-3 mr-1" />
-                  Export PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-white/20 text-blue-300 hover:bg-purple-500/10"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Refresh
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-white/20 text-blue-300 hover:bg-gray-500/10"
-                >
-                  <Settings className="h-3 w-3 mr-1" />
-                  Settings
-                </Button>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Search Results */}
-              <div className="lg:col-span-2">
+                  <input {...getInputProps()} />
+                  <motion.div
+                    animate={isDragActive ? { scale: 1.1 } : { scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <CloudUpload className="h-16 w-16 text-blue-400 mx-auto mb-4" />
+                  </motion.div>
+                  <h3 className="text-xl font-semibold text-white mb-2">
+                    {isDragActive ? 'Drop files here!' : 'Upload to Google Drive & AI Processing'}
+                  </h3>
+                  <p className="text-blue-200 mb-4">
+                    Files will be uploaded to Google Drive and processed by AI for intelligent search
+                  </p>
+                  <p className="text-sm text-blue-300/70">
+                    Supports: PDF, DOCX, XLSX, Images (PNG, JPG, TIFF), CSV
+                  </p>
+                </motion.div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input
+                    placeholder="System (e.g., Rolling Stock)"
+                    value={systemFilter}
+                    onChange={(e) => setSystemFilter(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                  />
+                  <Input
+                    placeholder="Subsystem (e.g., Doors)"
+                    value={subsystemFilter}
+                    onChange={(e) => setSubsystemFilter(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                  />
+                  <Input
+                    placeholder="Folder path (optional)"
+                    value={folderPath}
+                    onChange={(e) => setFolderPath(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                  />
+                </div>
+
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={createFolder}
+                    disabled={!folderPath.trim()}
+                    variant="outline"
+                    className="border-white/20 text-blue-300"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Folder
+                  </Button>
+                  <Button
+                    onClick={() => loadDriveFiles()}
+                    variant="outline"
+                    className="border-white/20 text-blue-300"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh Drive
+                  </Button>
+                  <Button
+                    onClick={() => window.open(googleDriveService.getDriveRootUrl(), '_blank')}
+                    variant="outline"
+                    className="border-white/20 text-blue-300"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Drive
+                  </Button>
+                </div>
+
+                {uploadedFiles.length > 0 && (
+                  <Card className="bg-white/5 border-white/10">
+                    <CardHeader>
+                      <CardTitle className="text-sm text-white">Upload Progress</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ScrollArea className="h-32 w-full">
+                        <div className="space-y-2">
+                          {uploadedFiles.map((file) => (
+                            <motion.div
+                              key={file.id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="flex items-center space-x-2 p-2 bg-white/5 rounded-lg"
+                            >
+                              {getFileIcon(file.type)}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-white truncate">{file.name}</p>
+                                <Progress value={file.progress} className="h-1 mt-1" />
+                              </div>
+                              {getStatusIcon(file.status)}
+                            </motion.div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* AI Search Tab */}
+              <TabsContent value="ai-search" className="space-y-4 mt-6">
+                <div className="flex space-x-2">
+                  <Input
+                    placeholder="Ask anything about your documents... (e.g., 'Show me door control specifications')"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch('ai')}
+                  />
+                  <Button
+                    onClick={() => handleSearch('ai')}
+                    disabled={isProcessing}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                  >
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="System filter (optional)"
+                    value={systemFilter}
+                    onChange={(e) => setSystemFilter(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                  />
+                  <Input
+                    placeholder="Subsystem filter (optional)"
+                    value={subsystemFilter}
+                    onChange={(e) => setSubsystemFilter(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-white/20 text-blue-300 hover:bg-blue-500/10"
+                    onClick={() => setSearchQuery('Show me door control unit specifications')}
+                  >
+                    <Zap className="h-3 w-3 mr-1" />
+                    Door Systems
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-white/20 text-blue-300 hover:bg-purple-500/10"
+                    onClick={() => setSearchQuery('Find HVAC system architecture')}
+                  >
+                    <Database className="h-3 w-3 mr-1" />
+                    HVAC Systems
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-white/20 text-blue-300 hover:bg-green-500/10"
+                    onClick={() => setSearchQuery('Show electrical circuit diagrams')}
+                  >
+                    <FileImage className="h-3 w-3 mr-1" />
+                    Circuit Diagrams
+                  </Button>
+                </div>
+              </TabsContent>
+
+              {/* Analysis Tab */}
+              <TabsContent value="analysis" className="space-y-4 mt-6">
+                <div className="text-center py-8">
+                  <Brain className="h-16 w-16 text-purple-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Advanced Document Analysis</h3>
+                  <p className="text-blue-200 mb-4">
+                    Select files from Google Drive and use AI search to get detailed technical analysis
+                  </p>
+                  <div className="flex justify-center space-x-4">
+                    <Button
+                      onClick={() => setActiveTab('drive-files')}
+                      className="bg-gradient-to-r from-blue-500 to-cyan-500"
+                    >
+                      <Folder className="h-4 w-4 mr-2" />
+                      Browse Drive Files
+                    </Button>
+                    <Button
+                      onClick={() => setActiveTab('ai-search')}
+                      variant="outline"
+                      className="border-white/20 text-blue-300"
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Start AI Search
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Results Tab */}
+              <TabsContent value="results" className="space-y-4 mt-6">
                 <ScrollArea className="h-[600px] w-full">
                   <AnimatePresence>
                     {results.length === 0 ? (
-                      <motion.div
+                      <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         className="text-center py-16"
                       >
                         <Database className="h-20 w-20 text-blue-400/30 mx-auto mb-6" />
                         <h3 className="text-xl font-semibold text-blue-200 mb-2">Ready for Intelligence</h3>
-                        <p className="text-blue-300/70">Upload documents and start searching with AI-powered analysis!</p>
+                        <p className="text-blue-300/70">
+                          Select files from Google Drive and run AI search to see detailed results here!
+                        </p>
                       </motion.div>
                     ) : (
                       <div className="space-y-4">
@@ -737,16 +1004,16 @@ export const MetroDashboard = () => {
                                     <div className="flex items-center space-x-2 mb-3">
                                       {getFileIcon(result.fileType)}
                                       <h3 className="font-semibold text-white text-lg">{result.title}</h3>
-                                      <Badge
-                                        variant="secondary"
+                                      <Badge 
+                                        variant="secondary" 
                                         className="bg-green-500/20 text-green-300 text-xs"
                                       >
                                         {Math.round(result.score * 100)}% Match
                                       </Badge>
                                     </div>
-
+                                    
                                     <p className="text-blue-200 mb-4 leading-relaxed">{result.content}</p>
-
+                                    
                                     <div className="flex flex-wrap gap-2 mb-4">
                                       <Badge variant="outline" className="border-blue-400/50 text-blue-300 bg-blue-500/10">
                                         📁 {result.system}
@@ -775,18 +1042,18 @@ export const MetroDashboard = () => {
                                       </details>
                                     )}
                                   </div>
-
+                                  
                                   <div className="flex flex-col space-y-2 ml-4">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
                                       className="text-blue-300 hover:bg-blue-500/10"
                                     >
                                       <Eye className="h-4 w-4" />
                                     </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
                                       className="text-green-300 hover:bg-green-500/10"
                                     >
                                       <Download className="h-4 w-4" />
@@ -801,75 +1068,8 @@ export const MetroDashboard = () => {
                     )}
                   </AnimatePresence>
                 </ScrollArea>
-              </div>
-
-              {/* Analysis Panel */}
-              <div className="space-y-4">
-                <Card className="bg-white/5 backdrop-blur-sm border-white/10">
-                  <CardHeader>
-                    <CardTitle className="text-sm text-white flex items-center space-x-2">
-                      <TrendingUp className="h-4 w-4 text-green-400" />
-                      <span>Analysis Summary</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {analysisResult ? (
-                      <div className="space-y-3">
-                        <p className="text-xs text-blue-200/80">{analysisResult.summary}</p>
-                        <div className="pt-2 border-t border-white/10">
-                          <p className="text-xs font-medium text-white mb-1">System Architecture:</p>
-                          <p className="text-xs text-blue-300">{analysisResult.system_architecture.name} v{analysisResult.system_architecture.version}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-blue-300/70">Run a search to see analysis results</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {analysisResult && (
-                  <>
-                    <Card className="bg-white/5 backdrop-blur-sm border-white/10">
-                      <CardHeader>
-                        <CardTitle className="text-sm text-white flex items-center space-x-2">
-                          <CircuitBoard className="h-4 w-4 text-yellow-400" />
-                          <span>Components ({analysisResult.components.length})</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {analysisResult.components.slice(0, 3).map((component, idx) => (
-                            <div key={idx} className="text-xs bg-white/5 p-2 rounded">
-                              <p className="font-medium text-white">{component.type}</p>
-                              <p className="text-blue-300/70">{component.part_number}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-white/5 backdrop-blur-sm border-white/10">
-                      <CardHeader>
-                        <CardTitle className="text-sm text-white flex items-center space-x-2">
-                          <Zap className="h-4 w-4 text-red-400" />
-                          <span>Wiring ({analysisResult.wire_details.length})</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {analysisResult.wire_details.slice(0, 3).map((wire, idx) => (
-                            <div key={idx} className="text-xs bg-white/5 p-2 rounded">
-                              <p className="font-medium text-white">Wire {wire.number}</p>
-                              <p className="text-blue-300/70">{wire.specification.substring(0, 40)}...</p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
-              </div>
-            </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </motion.div>
