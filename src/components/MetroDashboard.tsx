@@ -253,22 +253,67 @@ export const MetroDashboard: React.FC = () => {
       );
 
       // Convert analysis result to display format
-      const convertedResults: SearchResult[] = analysisResult.sources.map((source, index) => ({
-        id: index.toString(),
-        title: source.fileName,
-        content: source.preview,
-        system: 'Google Drive',
-        subsystem: 'Analysis',
-        score: source.score,
+      const convertedResults: SearchResult[] = [];
+      
+      // Add the main analysis result
+      convertedResults.push({
+        id: 'analysis_main',
+        title: 'AI Analysis Result',
+        content: analysisResult.technicalSummary,
+        system: 'AI Analysis',
+        subsystem: searchType,
+        score: 1.0,
         fileType: 'Analysis',
-        preview: source.preview,
+        preview: analysisResult.technicalSummary,
         sources: [{
-          fileName: source.fileName,
-          position: source.position,
-          score: source.score,
-          preview: source.preview
+          fileName: 'AI Analysis',
+          position: 0,
+          score: 1.0,
+          preview: analysisResult.technicalSummary
         }]
-      }));
+      });
+
+      // Add layman summary if available
+      if (analysisResult.laymanSummary) {
+        convertedResults.push({
+          id: 'analysis_layman',
+          title: 'Simplified Summary',
+          content: analysisResult.laymanSummary,
+          system: 'AI Analysis',
+          subsystem: 'Summary',
+          score: 0.9,
+          fileType: 'Summary',
+          preview: analysisResult.laymanSummary,
+          sources: [{
+            fileName: 'Layman Summary',
+            position: 0,
+            score: 0.9,
+            preview: analysisResult.laymanSummary
+          }]
+        });
+      }
+
+      // Add source documents if available
+      if (analysisResult.sources && analysisResult.sources.length > 0) {
+        analysisResult.sources.forEach((source, index) => {
+          convertedResults.push({
+            id: `source_${index}`,
+            title: source.fileName,
+            content: source.preview,
+            system: 'Google Drive',
+            subsystem: 'Source',
+            score: source.score,
+            fileType: 'Document',
+            preview: source.preview,
+            sources: [{
+              fileName: source.fileName,
+              position: source.position,
+              score: source.score,
+              preview: source.preview
+            }]
+          });
+        });
+      }
 
       setResults(convertedResults);
       setActiveTab('results');
@@ -314,7 +359,12 @@ export const MetroDashboard: React.FC = () => {
       toast.success(`Found ${convertedResults.length} relevant results`);
     } catch (error: any) {
       console.error('Search failed:', error);
-      toast.error(`Search failed: ${error.message}`);
+      
+      if (error.message.includes('Index is empty') || error.message.includes('Ingest files first')) {
+        toast.error('No documents in the system. Please upload files first or select files from Google Drive to analyze.');
+      } else {
+        toast.error(`Search failed: ${error.message}`);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -603,8 +653,13 @@ export const MetroDashboard: React.FC = () => {
                 ))}
               </div>
 
-              <div className="text-blue-200 text-sm">
-                <p>💡 Try asking: "What are the voltage requirements for traction power?" or "Show me signaling system specifications"</p>
+              <div className="bg-blue-600/10 border border-blue-400/20 rounded-lg p-4">
+                <h4 className="text-blue-300 font-medium mb-2">💡 How to use AI Search:</h4>
+                <div className="text-blue-200 text-sm space-y-1">
+                  <p><strong>Option 1:</strong> Upload documents first, then search the indexed content</p>
+                  <p><strong>Option 2:</strong> Go to Google Drive tab, select files, and click "Analyze with AI"</p>
+                  <p><strong>Example queries:</strong> "What are the voltage requirements?" or "Show me signaling specifications"</p>
+                </div>
               </div>
             </div>
           )}
