@@ -11,9 +11,11 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
  */
 function doGet(e) {
   try {
-    const action = e.parameter.action;
+    const action = e.parameter.action || 'test';
     
     switch (action) {
+      case 'test':
+        return handleTest(e);
       case 'listFiles':
         return handleListFiles(e);
       case 'listTree':
@@ -23,11 +25,36 @@ function doGet(e) {
       case 'search':
         return handleSearch(e);
       default:
-        return createResponse({ error: 'Invalid action' }, 400);
+        return createResponse({ 
+          error: 'Invalid action', 
+          availableActions: ['test', 'listFiles', 'listTree', 'downloadBase64', 'search']
+        });
     }
   } catch (error) {
     console.error('Error in doGet:', error);
-    return createResponse({ error: error.toString() }, 500);
+    return createResponse({ 
+      error: error.toString(),
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+/**
+ * Handle test requests for connection verification
+ */
+function handleTest(e) {
+  try {
+    return createResponse({
+      ok: true,
+      message: 'KMRCL Google Apps Script is working!',
+      timestamp: new Date().toISOString(),
+      folderId: MAIN_FOLDER_ID,
+      version: '2.0.0'
+    });
+  } catch (error) {
+    console.error('Error in test:', error);
+    return createResponse({ error: error.toString() });
   }
 }
 
@@ -363,17 +390,22 @@ function isTextFile(mimeType) {
 }
 
 /**
- * Create standardized response
+ * Create standardized response with proper CORS headers
  */
 function createResponse(data, status = 200) {
   const response = ContentService.createTextOutput(JSON.stringify(data));
   response.setMimeType(ContentService.MimeType.JSON);
   
-  // Add CORS headers
-  if (status !== 200) {
-    // For error responses, we still need to return 200 for CORS to work
-    return response;
-  }
+  // Add comprehensive CORS headers for all origins
+  response.setHeaders({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  });
   
   return response;
 }

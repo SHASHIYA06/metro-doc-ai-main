@@ -110,12 +110,13 @@ export const MetroDashboard: React.FC = () => {
       if (isConnected) {
         toast.success('Google Drive connected successfully');
       } else {
-        toast.error('Failed to connect to Google Drive');
+        console.warn('Google Drive connection failed - using backend-only mode');
+        toast.error('Google Drive unavailable - using backend storage');
       }
     } catch (error) {
       console.error('Drive connection failed:', error);
       setDriveConnectionStatus('error');
-      toast.error('Google Drive connection failed');
+      toast.error('Google Drive unavailable - using backend storage');
     }
   };
 
@@ -310,25 +311,70 @@ export const MetroDashboard: React.FC = () => {
     if (!files || files.length === 0) return;
 
     setIsProcessing(true);
+    const fileArray = Array.from(files);
+    let successCount = 0;
+    let errorCount = 0;
+
     try {
-      for (const file of Array.from(files)) {
-        toast.info(`Processing ${file.name}...`);
-        
-        // Upload to Google Drive
-        await googleDriveService.uploadFile(file, systemFilter, subsystemFilter);
-        
-        // Process with backend AI
-        await apiService.ingestFile(file, systemFilter, subsystemFilter);
+      toast.info(`Starting upload of ${fileArray.length} file(s)...`);
+
+      for (const file of fileArray) {
+        try {
+          toast.info(`Processing ${file.name}...`);
+          
+          // Try Google Drive upload first, but continue if it fails
+          let driveSuccess = false;
+          if (driveConnectionStatus === 'connected') {
+            try {
+              console.log('Uploading to Google Drive:', file.name);
+              const driveResult = await googleDriveService.uploadFile(file, systemFilter, subsystemFilter);
+              
+              if (driveResult.success) {
+                console.log('✅ Google Drive upload successful:', driveResult.fileId);
+                driveSuccess = true;
+              } else {
+                console.warn('Google Drive upload failed:', driveResult.error);
+              }
+            } catch (driveError) {
+              console.warn('Google Drive upload error:', driveError);
+            }
+          }
+          
+          // Always process with backend AI (this is the core functionality)
+          console.log('Processing with backend AI:', file.name);
+          await apiService.ingestFile(file, systemFilter, subsystemFilter);
+          
+          successCount++;
+          const driveStatus = driveSuccess ? ' (saved to Google Drive)' : ' (backend only)';
+          toast.success(`✅ ${file.name} processed successfully${driveStatus}`);
+          
+        } catch (fileError: any) {
+          console.error(`Error processing ${file.name}:`, fileError);
+          errorCount++;
+          toast.error(`❌ ${file.name}: ${fileError.message}`);
+        }
       }
       
-      toast.success(`Successfully processed ${files.length} file(s)`);
-      await loadBackendStats();
-      await loadDriveFiles();
+      // Final summary
+      if (successCount > 0) {
+        toast.success(`🎉 Successfully processed ${successCount} file(s)!`);
+        await loadBackendStats();
+        await loadDriveFiles();
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`⚠️ ${errorCount} file(s) failed to process`);
+      }
+      
     } catch (error: any) {
-      console.error('Upload failed:', error);
-      toast.error(`Upload failed: ${error.message}`);
+      console.error('Upload process failed:', error);
+      toast.error(`Upload process failed: ${error.message}`);
     } finally {
       setIsProcessing(false);
+      // Clear the input
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
 
@@ -436,25 +482,54 @@ export const MetroDashboard: React.FC = () => {
               </div>
 
               {/* File Upload */}
-              <div className="border-2 border-dashed border-blue-400 rounded-lg p-8 text-center">
+              <div 
+                className="border-2 border-dashed border-blue-400 rounded-lg p-8 text-center transition-colors hover:border-blue-300 hover:bg-blue-400/5"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.add('border-blue-300', 'bg-blue-400/10');
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove('border-blue-300', 'bg-blue-400/10');
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove('border-blue-300', 'bg-blue-400/10');
+                  const files = e.dataTransfer.files;
+                  if (files.length > 0) {
+                    const fakeEvent = {
+                      target: { files, value: '' }
+                    } as React.ChangeEvent<HTMLInputElement>;
+                    handleFileUpload(fakeEvent);
+                  }
+                }}
+              >
                 <Upload className="mx-auto mb-4 text-blue-400" size={48} />
                 <p className="text-blue-200 mb-4">
                   Drag and drop files here, or click to select
                 </p>
+                <p className="text-blue-300 text-sm mb-4">
+                  Supports: PDF, DOC, DOCX, TXT, CSV, XLSX, XLS, Images
+                </p>
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls"
+                  accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.gif,.bmp,.tiff"
                   onChange={handleFileUpload}
                   className="hidden"
                   id="file-upload"
+                  disabled={isProcessing}
                 />
                 <label
                   htmlFor="file-upload"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors"
+                  className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg cursor-pointer transition-colors ${
+                    isProcessing 
+                      ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
                 >
-                  <Upload size={20} />
-                  Select Files
+                  {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
+                  {isProcessing ? 'Processing...' : 'Select Files'}
                 </label>
               </div>
 

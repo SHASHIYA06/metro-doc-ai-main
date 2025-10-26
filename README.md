@@ -1,276 +1,307 @@
-# 🚇 KMRCL Metro Document Intelligence
+# 🚀 KMRCL Metro Document Intelligence
 
-An advanced AI-powered document search and analysis system specifically designed for metro railway engineering documentation. Built for **SHASHI SHEKHAR MISHRA** with cutting-edge RAG (Retrieval-Augmented Generation) technology.
+**AI-Powered Document Analysis System for KMRCL Metro Engineering**
 
-![KMRCL Metro Intelligence](https://img.shields.io/badge/KMRCL-Metro%20Intelligence-blue?style=for-the-badge&logo=train)
-![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=for-the-badge&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-3178C6?style=for-the-badge&logo=typescript)
-![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js)
-
-## ✨ Features
-
-### 🔍 Advanced Document Processing
-- **Multi-format Support**: PDF, DOCX, XLSX, CSV, Images (PNG, JPG, TIFF, BMP)
-- **Intelligent OCR**: Automatic text extraction from scanned documents and images
-- **Smart Chunking**: Context-aware text segmentation with overlap for better continuity
-- **Metadata Extraction**: Automatic extraction of part numbers, voltages, currents, and technical specifications
-
-### 🧠 AI-Powered Search
-- **Vector Search**: Semantic similarity search using Google Gemini embeddings
-- **RAG Technology**: Retrieval-Augmented Generation for accurate, context-aware responses
-- **Multi-modal Analysis**: Text, image, and structured data processing
-- **Technical Expertise**: Specialized for metro engineering terminology and concepts
-
-### 🎨 Modern UI/UX
-- **Glass Morphism Design**: Beautiful, modern interface with backdrop blur effects
-- **Responsive Layout**: Works seamlessly on desktop, tablet, and mobile devices
-- **Real-time Feedback**: Live upload progress, processing status, and search results
-- **Interactive Animations**: Smooth transitions and engaging visual effects
-
-### 🔧 Engineering-Focused
-- **System Classification**: Organize documents by system (Rolling Stock, Infrastructure, etc.)
-- **Subsystem Filtering**: Filter by subsystem (Doors, HVAC, Traction, Safety, etc.)
-- **Technical Metadata**: Extract and search by part numbers, specifications, and technical details
-- **Safety Emphasis**: Highlight safety-critical information and procedures
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-- Google Gemini API key
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd kmrcl-metro-intelligence
-   ```
-
-2. **Install frontend dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Install backend dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
-
-4. **Configure environment variables**
-   ```bash
-   # Backend configuration
-   cp backend/.env.example backend/.env
-   # Edit backend/.env and add your Gemini API key
-   ```
-
-5. **Start the development servers**
-   ```bash
-   # Terminal 1: Start backend
-   cd backend
-   npm start
-
-   # Terminal 2: Start frontend
-   npm run dev
-   ```
-
-6. **Open your browser**
-   Navigate to `http://localhost:5173`
-
-## 📁 Project Structure
-
-```
-kmrcl-metro-intelligence/
-├── src/                          # Frontend React application
-│   ├── components/              # React components
-│   │   ├── MetroDashboard.tsx   # Main dashboard component
-│   │   ├── MetroBackground.tsx  # Animated background
-│   │   └── ui/                  # Reusable UI components
-│   ├── hooks/                   # Custom React hooks
-│   ├── lib/                     # Utility functions
-│   └── types/                   # TypeScript type definitions
-├── backend/                     # Node.js backend server
-│   ├── server.js               # Main server file
-│   ├── package.json            # Backend dependencies
-│   └── uploads/                # Temporary file storage
-├── public/                     # Static assets
-└── docs/                       # Documentation
-```
-
-## 🔧 Configuration
-
-### Backend Configuration (backend/.env)
-
-```env
-# Required: Gemini AI API Key
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Server settings
-PORT=3000
-FRONTEND_URL=http://localhost:5173
-
-# RAG Configuration
-CHUNK_SIZE=1500
-CHUNK_OVERLAP=300
-MAX_SNIPPETS=15
-SIMILARITY_THRESHOLD=0.7
-```
-
-### Frontend Configuration
-
-The frontend automatically connects to the backend at `http://localhost:3000`. Update the API URL in the components if needed.
-
-## 📖 Usage Guide
-
-### 1. Document Upload
-- **Drag & Drop**: Simply drag files onto the upload area
-- **File Selection**: Click to browse and select multiple files
-- **System Classification**: Specify system (e.g., "Rolling Stock") and subsystem (e.g., "Doors")
-- **Batch Processing**: Upload multiple files simultaneously
-
-### 2. AI Search
-- **Natural Language**: Ask questions in plain English
-- **Technical Queries**: Search for specific components, specifications, or procedures
-- **System Filtering**: Filter results by system and subsystem
-- **Contextual Results**: Get relevant excerpts with source citations
-
-### 3. Search Types
-
-#### AI Search
-```
-"Show me door control unit specifications"
-"Find HVAC maintenance procedures"
-"What are the safety requirements for traction motors?"
-```
-
-#### Architecture Search
-```
-"Find circuit diagrams for door control systems"
-"Show me the wiring layout for HVAC controllers"
-```
-
-#### Structured Search
-Filter by system and subsystem for organized browsing.
-
-#### Keyword Search
-Traditional keyword-based search through OCR text.
-
-## 🛠️ API Endpoints
-
-### Document Processing
-- `POST /ingest` - Upload and process documents
-- `POST /clear` - Clear the document index
-
-### Search & Retrieval
-- `POST /ask` - AI-powered question answering
-- `POST /search-multi` - Multi-document search
-- `POST /search-by-tags` - Tag-based search
-
-### System Information
-- `GET /health` - Server health check
-- `GET /stats` - Index statistics and metrics
-
-## 🎨 UI Components
-
-### Glass Morphism Effects
-The application uses modern glass morphism design with:
-- Backdrop blur effects
-- Semi-transparent backgrounds
-- Subtle borders and shadows
-- Smooth animations and transitions
-
-### Responsive Design
-- Mobile-first approach
-- Adaptive layouts for all screen sizes
-- Touch-friendly interactions
-- Optimized performance
-
-## 🔍 Technical Details
-
-### Document Processing Pipeline
-1. **File Upload**: Multi-format file handling with validation
-2. **Text Extraction**: Format-specific extraction (PDF, DOCX, OCR for images)
-3. **Preprocessing**: Text cleaning and normalization
-4. **Chunking**: Smart text segmentation with context preservation
-5. **Embedding**: Vector generation using Google Gemini
-6. **Indexing**: Storage in optimized vector database
-
-### Search Algorithm
-1. **Query Processing**: Natural language understanding
-2. **Vector Search**: Semantic similarity matching
-3. **Filtering**: System/subsystem/tag-based filtering
-4. **Ranking**: Multi-factor scoring with relevance boosting
-5. **Response Generation**: Context-aware answer synthesis
-
-### Performance Optimizations
-- Efficient chunking strategies
-- Optimized vector operations
-- Caching for repeated queries
-- Batch processing for uploads
-- Progressive loading for large datasets
-
-## 🚀 Deployment
-
-### Production Build
-```bash
-# Build frontend
-npm run build
-
-# Start backend in production
-cd backend
-NODE_ENV=production npm start
-```
-
-### Docker Deployment
-```bash
-# Build and run with Docker
-docker-compose up --build
-```
-
-### Environment Variables for Production
-```env
-NODE_ENV=production
-FRONTEND_URL=https://your-domain.com
-GEMINI_API_KEY=your_production_api_key
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👨‍💻 Author
-
-**SHASHI SHEKHAR MISHRA**
-- Specialized in metro railway engineering systems
-- Expert in document management and technical analysis
-- Focused on safety-critical transportation infrastructure
-
-## 🙏 Acknowledgments
-
-- Google Gemini AI for advanced language processing
-- React and TypeScript communities
-- Metro engineering professionals who provided domain expertise
-- Open source contributors who made this project possible
-
-## 📞 Support
-
-For technical support or questions about metro engineering applications:
-- Create an issue in this repository
-- Contact the development team
-- Refer to the documentation in the `/docs` folder
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SHASHIYA06/metro-doc-ai-main)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/SHASHIYA06/metro-doc-ai-main)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
 
-**Built with ❤️ for Metro Engineering Excellence**
+## 🌟 **Features**
 
-*Enhancing safety, efficiency, and reliability in metro transportation systems through intelligent document management.*
+### **🎨 Advanced 3D User Interface**
+- Beautiful animated interface with dynamic particle effects
+- Glass morphism design with professional styling
+- Interactive 3D elements and smooth transitions
+- Responsive design for all devices
+
+### **🧠 AI-Powered Document Analysis**
+- Natural language search using Google Gemini AI
+- Multi-format support: PDF, DOCX, XLSX, Images with OCR
+- Intelligent text extraction and analysis
+- Confidence scoring and source citations
+
+### **📁 Google Drive Integration**
+- Seamless file management and organization
+- Real-time synchronization with Google Drive
+- Folder navigation and file browser
+- Batch file operations
+
+### **📊 Professional Export System**
+- PDF reports with technical analysis
+- Word documents with proper formatting
+- Excel workbooks with structured data
+- Rich content with metadata and sources
+
+### **🔄 Real-time Monitoring**
+- Live connection status for all services
+- Performance metrics and statistics
+- Error handling and user feedback
+- System health monitoring
+
+---
+
+## 🚀 **Quick Start**
+
+### **Prerequisites**
+- Node.js 18+ 
+- Google Account (for Drive integration)
+- Gemini API Key (from Google AI Studio)
+
+### **Installation**
+```bash
+# Clone the repository
+git clone https://github.com/SHASHIYA06/metro-doc-ai-main.git
+cd metro-doc-ai-main
+
+# Install dependencies
+npm install
+
+# Install backend dependencies
+cd backend && npm install && cd ..
+
+# Build the application
+npm run build
+```
+
+### **Environment Setup**
+1. Copy `.env.production` and update with your URLs
+2. Get Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+3. Deploy Google Apps Script (see deployment guide below)
+
+---
+
+## 🔧 **Configuration**
+
+### **Frontend Environment Variables**
+```env
+VITE_API_BASE_URL=https://your-backend-url.onrender.com
+VITE_APP_SCRIPT_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
+VITE_APP_NAME=KMRCL Metro Document Intelligence
+VITE_APP_VERSION=2.0.0
+```
+
+### **Backend Environment Variables**
+```env
+NODE_ENV=production
+GEMINI_API_KEY=your_actual_gemini_api_key
+FRONTEND_URL=https://your-frontend-url.netlify.app
+PORT=3000
+```
+
+---
+
+## 📋 **Deployment Guide**
+
+### **🔥 CRITICAL: Google Apps Script Deployment**
+
+**⚠️ The Google Apps Script MUST be deployed first for full functionality!**
+
+1. **Go to Google Apps Script Console**
+   - Visit: https://script.google.com
+   - Create new project: "KMRCL Metro Drive Integration"
+
+2. **Deploy the Script**
+   - Copy entire content from `google-apps-script/Code.gs`
+   - Enable Google Drive API service
+   - Deploy as Web App with "Anyone" access
+   - Copy the deployment URL
+
+3. **Test the Deployment**
+   ```bash
+   node scripts/test-google-drive.js
+   ```
+
+### **Backend Deployment (Render)**
+
+1. **Create Render Account**: https://render.com
+2. **Connect Repository**: `SHASHIYA06/metro-doc-ai-main`
+3. **Configure Service**:
+   - Root Directory: `backend`
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+4. **Set Environment Variables** (see above)
+
+### **Frontend Deployment (Netlify)**
+
+1. **Create Netlify Account**: https://netlify.com
+2. **Connect Repository**: `SHASHIYA06/metro-doc-ai-main`
+3. **Configure Build**:
+   - Build Command: `npm run build`
+   - Publish Directory: `dist`
+4. **Set Environment Variables** (see above)
+
+---
+
+## 🧪 **Testing & Verification**
+
+### **Run All Tests**
+```bash
+# Test build process
+npm run build
+
+# Test Google Apps Script connection
+node scripts/test-google-drive.js
+
+# Run deployment verification
+node scripts/deployment-verification.js
+
+# Test complete application
+node scripts/test-application.js
+```
+
+### **Expected Results**
+- ✅ Build completes without errors
+- ✅ Google Apps Script responds correctly
+- ✅ All verification checks pass (31/31)
+- ✅ Application loads with green status indicators
+
+---
+
+## 📁 **Project Structure**
+
+```
+metro-doc-ai-main/
+├── 🎨 Frontend (React + TypeScript + Tailwind)
+│   ├── src/components/
+│   │   ├── MetroDashboard.tsx          # Main dashboard
+│   │   ├── Enhanced3DBackground.tsx    # 3D animations
+│   │   └── StatusIndicator.tsx         # Connection monitoring
+│   ├── src/services/
+│   │   ├── api.ts                      # Backend API
+│   │   ├── googleDrive.ts              # Google Drive integration
+│   │   └── exportService.ts            # Export functionality
+│   └── src/config/
+│       └── environment.ts              # Configuration
+├── 🔧 Backend (Node.js + Express + AI)
+│   └── server.js                       # Complete API server
+├── 📜 Google Apps Script
+│   └── Code.gs                         # Drive integration script
+├── 🚀 Deployment
+│   ├── FINAL_DEPLOYMENT_GUIDE.md       # Detailed instructions
+│   ├── GOOGLE_APPS_SCRIPT_DEPLOYMENT.md # Apps Script guide
+│   └── scripts/                        # Testing and verification
+└── 📖 Documentation
+    ├── README.md                       # This file
+    └── COMPLETE_APPLICATION_SUMMARY.md  # Full feature overview
+```
+
+---
+
+## 🔍 **Usage**
+
+### **1. Upload Documents**
+- Drag and drop files or click to select
+- Supports: PDF, DOC, DOCX, TXT, CSV, XLSX, Images
+- Files are processed with AI and stored in Google Drive
+
+### **2. AI-Powered Search**
+- Ask natural language questions
+- Example: "What are the voltage requirements for traction power?"
+- Get intelligent results with confidence scores
+
+### **3. Google Drive Management**
+- Browse files and folders
+- Create new folders with system/subsystem organization
+- Select multiple files for batch analysis
+
+### **4. Export Results**
+- Generate professional PDF reports
+- Create formatted Word documents
+- Export structured Excel workbooks
+
+---
+
+## 🛠️ **Troubleshooting**
+
+### **❌ "Google Drive not connected"**
+- Verify Apps Script is deployed with "Anyone" access
+- Check Apps Script URL in environment variables
+- Run `node scripts/test-google-drive.js` to diagnose
+
+### **❌ "Backend not connected"**
+- Check backend URL in environment variables
+- Verify backend is running: visit `/health` endpoint
+- Ensure Gemini API key is set correctly
+
+### **❌ "Upload fails"**
+- Check file size (max 50MB)
+- Verify file format is supported
+- Check browser console for detailed errors
+
+### **❌ "Build fails"**
+- Ensure all dependencies are installed: `npm install`
+- Check Node.js version (18+ required)
+- Run `npm run build` and check for errors
+
+---
+
+## 📊 **System Requirements**
+
+### **Development**
+- Node.js 18+
+- npm 9+
+- Modern browser (Chrome, Firefox, Safari, Edge)
+
+### **Production**
+- Render.com account (backend hosting)
+- Netlify.com account (frontend hosting)
+- Google Account (Apps Script and Drive)
+- Gemini API key (Google AI Studio)
+
+---
+
+## 🤝 **Contributing**
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+---
+
+## 📄 **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 👨‍💻 **Built By**
+
+**SHASHI SHEKHAR MISHRA**  
+KMRCL Engineering Team  
+
+📧 Email: [Contact via GitHub](https://github.com/SHASHIYA06)  
+🔗 Repository: https://github.com/SHASHIYA06/metro-doc-ai-main  
+🌐 Live Demo: https://kmrcldocumentsearchgoogledrive.netlify.app  
+
+---
+
+## 🎯 **Version Information**
+
+- **Version**: 2.0.0
+- **Release Date**: 2024
+- **Status**: Production Ready
+- **Last Updated**: Latest commit
+
+---
+
+## 🚀 **Deployment Status**
+
+| Component | Status | URL |
+|-----------|--------|-----|
+| **Frontend** | ✅ Ready | https://kmrcldocumentsearchgoogledrive.netlify.app |
+| **Backend** | ✅ Ready | https://metro-doc-ai-main.onrender.com |
+| **Apps Script** | ⚠️ Needs Deployment | [Deploy Now](https://script.google.com) |
+| **GitHub** | ✅ Synchronized | https://github.com/SHASHIYA06/metro-doc-ai-main |
+
+---
+
+**🎉 Ready for Production Deployment!**
+
+For detailed deployment instructions, see:
+- 📖 [Complete Deployment Guide](FINAL_DEPLOYMENT_GUIDE.md)
+- 📜 [Google Apps Script Setup](GOOGLE_APPS_SCRIPT_DEPLOYMENT.md)
+- 📋 [Application Summary](COMPLETE_APPLICATION_SUMMARY.md)

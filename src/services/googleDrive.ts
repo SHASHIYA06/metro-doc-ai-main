@@ -1,6 +1,6 @@
 // Google Drive service for KMRCL Metro Document Intelligence
 
-import { DRIVE_ENDPOINTS, config } from '@/config/environment';
+import { DRIVE_ENDPOINTS, config } from '../config/environment';
 
 export interface DriveFile {
   id: string;
@@ -255,11 +255,40 @@ class GoogleDriveService {
   // Test connection to Google Apps Script
   async testConnection(): Promise<boolean> {
     try {
-      // Try to list folders as a connection test
-      await this.listFolders();
-      return true;
+      console.log('Testing Google Apps Script connection...');
+      console.log('Apps Script URL:', this.baseURL);
+      
+      // First try the test endpoint
+      const testUrl = `${this.baseURL}?action=test`;
+      console.log('Testing URL:', testUrl);
+      
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        console.error('HTTP Error:', response.status, response.statusText);
+        return false;
+      }
+
+      const data = await response.json();
+      console.log('Test response:', data);
+
+      if (data.ok && data.message) {
+        console.log('✅ Google Apps Script connection successful');
+        return true;
+      } else {
+        console.error('❌ Invalid response from Apps Script:', data);
+        return false;
+      }
     } catch (error) {
-      console.error('Google Drive connection test failed:', error);
+      console.error('❌ Google Drive connection test failed:', error);
       return false;
     }
   }

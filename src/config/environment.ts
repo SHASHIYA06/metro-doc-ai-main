@@ -49,6 +49,7 @@ export const API_ENDPOINTS = {
 
 // Google Apps Script endpoints
 export const DRIVE_ENDPOINTS = {
+  TEST: `${config.APP_SCRIPT_URL}?action=test`,
   LIST_FILES: `${config.APP_SCRIPT_URL}?action=listFiles`,
   LIST_TREE: `${config.APP_SCRIPT_URL}?action=listTree`,
   DOWNLOAD_FILE: `${config.APP_SCRIPT_URL}?action=downloadBase64`,
