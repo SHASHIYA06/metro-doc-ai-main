@@ -285,12 +285,12 @@ class AIAnalysisService {
     }
 
     try {
-      console.log('🔍 Starting analysis of', selectedFileIds.length, 'files');
+      console.log('🔍 Starting comprehensive analysis of', selectedFileIds.length, 'files');
       console.log('📋 Query:', query);
       console.log('🔧 Search type:', searchType);
       
-      // Extract file contents from Google Drive
-      console.log('📥 Extracting file contents from Google Drive...');
+      // Step 1: Extract file contents from Google Drive
+      console.log('📥 Step 1: Extracting file contents from Google Drive...');
       const fileContents = await googleDriveService.extractFileContents(selectedFileIds);
       
       if (fileContents.length === 0) {
@@ -304,27 +304,156 @@ class AIAnalysisService {
         console.log(`📄 File ${index + 1}: ${content.name} (${content.content.length} chars)`);
       });
       
-      // Create a simple analysis result from the extracted content
-      const combinedContent = fileContents.map(f => `File: ${f.name}\nContent: ${f.content}`).join('\n\n');
+      // Step 2: Ingest files into backend for AI processing
+      console.log('📤 Step 2: Ingesting files into backend...');
+      await this.ingestFileContents(fileContents);
       
-      // Try backend analysis first
+      // Step 3: Wait a moment for indexing
+      console.log('⏳ Step 3: Waiting for backend indexing...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Step 4: Perform AI search on the ingested content
+      console.log('🤖 Step 4: Performing AI search on ingested content...');
       try {
-        console.log('🤖 Attempting backend AI analysis...');
-        const result = await this.analyzeWithAI(fileContents, query, searchType);
-        console.log('✅ Backend analysis successful');
-        return result;
-      } catch (aiError) {
-        console.warn('⚠️ Backend analysis failed, creating local analysis:', aiError);
+        const searchResponse = await fetch(`${this.backendURL}/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            query: query,
+            k: 15,
+            system: 'Google Drive',
+            subsystem: 'Analysis',
+            tags: []
+          })
+        });
+
+        if (!searchResponse.ok) {
+          const errorText = await searchResponse.text();
+          throw new Error(`AI search failed: ${errorText}`);
+        }
+
+        const searchResult = await searchResponse.json();
+        console.log('✅ AI search successful:', searchResult);
+
+        // Step 5: Create comprehensive analysis result
+        return this.createComprehensiveAnalysis(fileContents, searchResult, query, searchType);
         
-        // Create a local analysis result
-        const localAnalysis = this.createLocalAnalysis(fileContents, query, searchType);
-        console.log('✅ Local analysis created');
-        return localAnalysis;
+      } catch (searchError) {
+        console.warn('⚠️ Backend AI search failed, creating enhanced local analysis:', searchError);
+        
+        // Fallback to enhanced local analysis
+        return this.createEnhancedLocalAnalysis(fileContents, query, searchType);
       }
     } catch (error) {
       console.error('❌ File analysis failed:', error);
       throw new Error(`File analysis failed: ${error.message}`);
     }
+  }
+
+  // Create comprehensive analysis combining backend AI and file content
+  private createComprehensiveAnalysis(
+    fileContents: FileContent[],
+    searchResult: any,
+    query: string,
+    searchType: SearchType
+  ): AnalysisResult {
+    const answer = searchResult.answer || searchResult.response || "AI analysis completed";
+    const sources = searchResult.sources || [];
+    
+    // Combine AI answer with file content analysis
+    const fileNames = fileContents.map(f => f.name).join(', ');
+    const totalContent = fileContents.reduce((sum, f) => sum + f.content.length, 0);
+    
+    const technicalSummary = `AI Analysis Results for Query: "${query}"
+
+Backend AI Response:
+${answer}
+
+File Analysis Summary:
+- Files analyzed: ${fileContents.length} (${fileNames})
+- Total content processed: ${totalContent.toLocaleString()} characters
+- Search type: ${searchType}
+- Sources found: ${sources.length}
+
+The AI has processed your selected files and provided the above analysis based on your query.`;
+
+    const laymanSummary = `I analyzed ${fileContents.length} documents from your Google Drive selection. ${answer.length > 200 ? answer.substring(0, 200) + '...' : answer}`;
+
+    return {
+      technicalSummary,
+      laymanSummary,
+      wireDetails: this.extractWireDetailsFromText(answer),
+      components: this.extractComponentsFromText(answer),
+      architectureSuggestion: this.generateArchitectureSuggestion(answer),
+      sources: [
+        ...this.extractSources(sources),
+        ...fileContents.map((file, index) => ({
+          fileName: file.name,
+          score: 0.9,
+          position: index,
+          preview: file.content.substring(0, 300) + (file.content.length > 300 ? '...' : '')
+        }))
+      ],
+      raw: answer
+    };
+  }
+
+  // Create enhanced local analysis with better content processing
+  private createEnhancedLocalAnalysis(
+    fileContents: FileContent[],
+    query: string,
+    searchType: SearchType
+  ): AnalysisResult {
+    const combinedContent = fileContents.map(f => f.content).join(' ');
+    const fileNames = fileContents.map(f => f.name).join(', ');
+    
+    // Perform keyword matching and content analysis
+    const queryWords = query.toLowerCase().split(' ').filter(word => word.length > 2);
+    const relevantSections: string[] = [];
+    
+    // Find relevant sections in the content
+    fileContents.forEach(file => {
+      const content = file.content.toLowerCase();
+      queryWords.forEach(word => {
+        const index = content.indexOf(word);
+        if (index !== -1) {
+          const start = Math.max(0, index - 100);
+          const end = Math.min(content.length, index + 200);
+          const section = file.content.substring(start, end);
+          relevantSections.push(`From ${file.name}: ...${section}...`);
+        }
+      });
+    });
+    
+    const technicalSummary = `Local Analysis Results for Query: "${query}"
+
+Files Analyzed: ${fileNames}
+Total Content: ${combinedContent.length.toLocaleString()} characters
+Search Type: ${searchType}
+
+${relevantSections.length > 0 ? 
+  `Relevant Content Found:\n${relevantSections.slice(0, 3).join('\n\n')}` : 
+  `Content Overview:\n${combinedContent.substring(0, 500)}${combinedContent.length > 500 ? '...' : ''}`
+}
+
+Note: This is a local analysis. For AI-powered insights, ensure the backend is properly configured.`;
+    
+    const laymanSummary = `I found ${relevantSections.length} relevant sections in your ${fileContents.length} selected documents related to "${query}". ${relevantSections.length > 0 ? 'The documents contain information that matches your search terms.' : 'The documents have been processed but may need more specific search terms.'}`;
+    
+    return {
+      technicalSummary,
+      laymanSummary,
+      wireDetails: this.extractWireDetailsFromText(combinedContent),
+      components: this.extractComponentsFromText(combinedContent),
+      architectureSuggestion: this.generateArchitectureSuggestion(combinedContent),
+      sources: fileContents.map((file, index) => ({
+        fileName: file.name,
+        score: 0.8,
+        position: index,
+        preview: file.content.substring(0, 200) + (file.content.length > 200 ? '...' : '')
+      })),
+      raw: technicalSummary
+    };
   }
 
   // Create local analysis when backend fails

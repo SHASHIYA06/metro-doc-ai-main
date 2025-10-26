@@ -249,32 +249,47 @@ export const MetroDashboard: React.FC = () => {
     setIsProcessing(true);
     try {
       const selectedFileIds = Array.from(selectedFiles);
+      const selectedFileNames = driveFiles
+        .filter(f => selectedFiles.has(f.id))
+        .map(f => f.name)
+        .join(', ');
+      
       const query = searchQuery || 'Analyze these selected documents for technical specifications and details';
       
-      toast.info(`Analyzing ${selectedFileIds.length} files from Google Drive...`);
-
-      // Use the new AI analysis service
+      console.log('🔍 Starting AI analysis...');
+      console.log('📁 Selected files:', selectedFileNames);
+      console.log('❓ Query:', query);
+      
+      // Show progress messages
+      toast.info(`🔍 Starting analysis of ${selectedFileIds.length} files...`);
+      
+      // Step 1: Extract and process files
+      toast.info(`📥 Extracting content from: ${selectedFileNames}`);
+      
+      // Use the enhanced AI analysis service
       const analysisResult = await aiAnalysisService.analyzeSelectedFiles(
         selectedFileIds,
         query,
         searchType
       );
 
+      console.log('✅ Analysis result received:', analysisResult);
+
       // Convert analysis result to display format
       const convertedResults: SearchResult[] = [];
       
-      // Add the main analysis result
+      // Add the main technical analysis result
       convertedResults.push({
-        id: 'analysis_main',
-        title: 'AI Analysis Result',
+        id: 'analysis_technical',
+        title: `🤖 AI Technical Analysis - ${searchType.toUpperCase()}`,
         content: analysisResult.technicalSummary,
         system: 'AI Analysis',
         subsystem: searchType,
         score: 1.0,
-        fileType: 'Analysis',
-        preview: analysisResult.technicalSummary,
+        fileType: 'AI Analysis',
+        preview: analysisResult.technicalSummary.substring(0, 300) + '...',
         sources: [{
-          fileName: 'AI Analysis',
+          fileName: 'AI Technical Analysis',
           position: 0,
           score: 1.0,
           preview: analysisResult.technicalSummary
@@ -282,34 +297,82 @@ export const MetroDashboard: React.FC = () => {
       });
 
       // Add layman summary if available
-      if (analysisResult.laymanSummary) {
+      if (analysisResult.laymanSummary && analysisResult.laymanSummary !== analysisResult.technicalSummary) {
         convertedResults.push({
-          id: 'analysis_layman',
-          title: 'Simplified Summary',
+          id: 'analysis_summary',
+          title: '📋 Simplified Summary',
           content: analysisResult.laymanSummary,
           system: 'AI Analysis',
           subsystem: 'Summary',
-          score: 0.9,
+          score: 0.95,
           fileType: 'Summary',
           preview: analysisResult.laymanSummary,
           sources: [{
-            fileName: 'Layman Summary',
+            fileName: 'Simplified Summary',
             position: 0,
-            score: 0.9,
+            score: 0.95,
             preview: analysisResult.laymanSummary
           }]
         });
       }
 
-      // Add source documents if available
+      // Add wire details if found
+      if (analysisResult.wireDetails && analysisResult.wireDetails.length > 0) {
+        const wireContent = analysisResult.wireDetails.map(wire => 
+          `Wire ${wire.id}: ${wire.spec} (${wire.from} → ${wire.to}) - ${wire.voltage}, ${wire.current}`
+        ).join('\n');
+        
+        convertedResults.push({
+          id: 'analysis_wires',
+          title: '⚡ Wire & Cable Details',
+          content: wireContent,
+          system: 'Technical Analysis',
+          subsystem: 'Wiring',
+          score: 0.9,
+          fileType: 'Wire Details',
+          preview: wireContent,
+          sources: [{
+            fileName: 'Wire Analysis',
+            position: 0,
+            score: 0.9,
+            preview: wireContent
+          }]
+        });
+      }
+
+      // Add component details if found
+      if (analysisResult.components && analysisResult.components.length > 0) {
+        const componentContent = analysisResult.components.map(comp => 
+          `${comp.name} (${comp.type}) - Location: ${comp.location} - Specs: ${JSON.stringify(comp.specs)}`
+        ).join('\n');
+        
+        convertedResults.push({
+          id: 'analysis_components',
+          title: '🔧 Component Analysis',
+          content: componentContent,
+          system: 'Technical Analysis',
+          subsystem: 'Components',
+          score: 0.9,
+          fileType: 'Components',
+          preview: componentContent,
+          sources: [{
+            fileName: 'Component Analysis',
+            position: 0,
+            score: 0.9,
+            preview: componentContent
+          }]
+        });
+      }
+
+      // Add source documents
       if (analysisResult.sources && analysisResult.sources.length > 0) {
         analysisResult.sources.forEach((source, index) => {
           convertedResults.push({
             id: `source_${index}`,
-            title: source.fileName,
+            title: `📄 ${source.fileName}`,
             content: source.preview,
-            system: 'Google Drive',
-            subsystem: 'Source',
+            system: 'Source Document',
+            subsystem: 'Google Drive',
             score: source.score,
             fileType: 'Document',
             preview: source.preview,
@@ -323,13 +386,21 @@ export const MetroDashboard: React.FC = () => {
         });
       }
 
+      // Update results and switch to results tab
       setResults(convertedResults);
       setActiveTab('results');
-      toast.success(`Analysis complete! Found ${convertedResults.length} relevant results`);
+      
+      // Clear file selection
+      setSelectedFiles(new Set());
+      
+      // Success message
+      toast.success(`🎉 AI Analysis Complete! Generated ${convertedResults.length} results from ${selectedFileIds.length} files`);
+      
+      console.log('✅ Analysis completed successfully:', convertedResults.length, 'results generated');
 
     } catch (error: any) {
-      console.error('Analysis failed:', error);
-      toast.error(`Analysis failed: ${error.message}`);
+      console.error('❌ Analysis failed:', error);
+      toast.error(`❌ Analysis failed: ${error.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -775,10 +846,20 @@ Query: ${searchQuery}
               <div className="bg-blue-600/10 border border-blue-400/20 rounded-lg p-4">
                 <h4 className="text-blue-300 font-medium mb-2">💡 How to use AI Search:</h4>
                 <div className="text-blue-200 text-sm space-y-1">
-                  <p><strong>Option 1:</strong> Upload documents first, then search the indexed content</p>
-                  <p><strong>Option 2:</strong> Go to Google Drive tab, select files, and click "Analyze with AI"</p>
+                  <p><strong>Recommended:</strong> Go to Google Drive tab → Select files → Click "Analyze with AI"</p>
+                  <p><strong>Alternative:</strong> Upload documents first, then search the indexed content here</p>
                   <p><strong>Example queries:</strong> "What are the voltage requirements?" or "Show me signaling specifications"</p>
                 </div>
+                {backendStats && backendStats.totalChunks > 0 && (
+                  <div className="mt-2 p-2 bg-green-600/20 border border-green-400/20 rounded text-green-300 text-sm">
+                    ✅ Backend has {backendStats.totalChunks} indexed chunks ready for search
+                  </div>
+                )}
+                {(!backendStats || backendStats.totalChunks === 0) && (
+                  <div className="mt-2 p-2 bg-yellow-600/20 border border-yellow-400/20 rounded text-yellow-300 text-sm">
+                    ⚠️ No documents indexed yet. Use Google Drive analysis for best results.
+                  </div>
+                )}
               </div>
             </div>
           )}
