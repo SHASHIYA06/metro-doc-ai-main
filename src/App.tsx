@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { MetroDashboard } from "./components/MetroDashboard";
-import { MetroBackground } from "./components/MetroBackground";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -17,7 +16,6 @@ const App = () => (
         <Toaster />
         <Sonner />
         <div className="min-h-screen relative overflow-hidden">
-          <MetroBackground />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<MetroDashboard />} />

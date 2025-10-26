@@ -2,7 +2,7 @@
 // This script handles Google Drive integration for file management and search
 
 // Configuration
-const MAIN_FOLDER_ID = '1mjA3OiBaDX1-ins9Myr8QtU8esyyKkTG'; // Your main folder ID
+const MAIN_FOLDER_ID = '1fUHu5fb5Z77Aq4cAiK4Zybq-Dpgjf0xlzEDsxIgT9m8'; // Your main Google Drive folder ID
 const MAX_FILES_PER_REQUEST = 100;
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
 

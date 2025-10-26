@@ -26,7 +26,6 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://kmrcldocumentsearchgoogledrive.netlify.app',
-  'https://kmrcl-metro-intelligence.netlify.app',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 

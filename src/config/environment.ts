@@ -30,7 +30,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     APP_NAME: 'KMRCL Metro Document Intelligence',
     VERSION: '2.0.0',
     ENVIRONMENT: isDevelopment ? 'development' : 'production',
-    MAIN_FOLDER_ID: '1mjA3OiBaDX1-ins9Myr8QtU8esyyKkTG'
+    MAIN_FOLDER_ID: '1fUHu5fb5Z77Aq4cAiK4Zybq-Dpgjf0xlzEDsxIgT9m8'
   };
 };
 
