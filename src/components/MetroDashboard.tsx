@@ -192,6 +192,101 @@ export const MetroDashboard: React.FC = () => {
     loadDriveFiles(folderId);
   };
 
+  // NEW FUNCTION: Auto-load folder contents for AI Search
+  const autoLoadFolderForAI = async (folderId: string, folderName: string) => {
+    console.log('🤖 AUTO-LOADING FOLDER FOR AI:', folderName);
+    toast.info(`🤖 Auto-loading "${folderName}" folder for AI Search...`);
+    
+    try {
+      // Load files in the folder
+      await loadDriveFiles(folderId);
+      
+      // Wait a moment for files to load
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get all files in the current folder
+      const folderFiles = driveFiles.filter(f => f.type === 'file');
+      
+      if (folderFiles.length === 0) {
+        toast.info(`📁 Folder "${folderName}" has no files to load for AI Search`);
+        return;
+      }
+      
+      console.log(`📁 Found ${folderFiles.length} files in folder "${folderName}"`);
+      toast.info(`📁 Found ${folderFiles.length} files in "${folderName}" - Processing for AI Search...`);
+      
+      // Extract file IDs
+      const fileIds = folderFiles.map(f => f.id);
+      
+      // Process files for AI Search
+      await processFilesForAISearch(fileIds, folderName);
+      
+    } catch (error) {
+      console.error('❌ Auto-load folder failed:', error);
+      toast.error(`❌ Failed to auto-load folder "${folderName}": ${error.message}`);
+    }
+  };
+
+  // NEW FUNCTION: Process files for AI Search (simplified version)
+  const processFilesForAISearch = async (fileIds: string[], folderName: string) => {
+    console.log('🚀 PROCESSING FILES FOR AI SEARCH:', fileIds.length, 'files');
+    
+    try {
+      // Step 1: Extract file contents
+      toast.info(`📥 Extracting content from ${fileIds.length} files...`);
+      const fileContents = await googleDriveService.extractFileContents(fileIds);
+      
+      if (fileContents.length === 0) {
+        throw new Error('No file contents could be extracted');
+      }
+      
+      console.log(`✅ Extracted ${fileContents.length} files`);
+      toast.success(`✅ Extracted content from ${fileContents.length} files`);
+      
+      // Step 2: Upload to backend
+      toast.info(`📚 Uploading ${fileContents.length} files to AI backend...`);
+      
+      const files: File[] = fileContents.map(content => {
+        const blob = new Blob([content.content], { type: content.mimeType });
+        return new File([blob], content.name, { type: content.mimeType });
+      });
+      
+      const uploadResult = await apiService.uploadFiles(files, `Folder: ${folderName}`, 'AI Search Ready');
+      
+      if (uploadResult.added === 0) {
+        throw new Error('No files were uploaded successfully');
+      }
+      
+      console.log(`✅ Uploaded ${uploadResult.added} files`);
+      toast.success(`✅ Uploaded ${uploadResult.added} files to AI backend`);
+      
+      // Step 3: Wait for indexing
+      toast.info(`⏳ AI is indexing your ${uploadResult.added} files...`);
+      await new Promise(resolve => setTimeout(resolve, 6000));
+      
+      // Step 4: Refresh stats and switch to AI Search
+      await loadBackendStats();
+      
+      // Step 5: Auto-switch to AI Search tab
+      toast.success(`🎉 SUCCESS! Folder "${folderName}" loaded for AI Search`);
+      toast.success(`🔄 Switching to AI Search tab...`);
+      
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      setActiveTab('ai-search');
+      
+      setTimeout(() => {
+        toast.success(`✅ READY! ${uploadResult.added} files from "${folderName}" are now available for AI Search!`);
+        toast.success(`💡 Ask any question about your documents!`);
+      }, 500);
+      
+      console.log('✅ FOLDER AUTO-LOAD COMPLETE - AI Search ready!');
+      
+    } catch (error) {
+      console.error('❌ Process files for AI Search failed:', error);
+      toast.error(`❌ Failed to process files: ${error.message}`);
+    }
+  };
+
   const navigateBack = () => {
     if (folderHistory.length <= 1) return;
     
@@ -1123,9 +1218,9 @@ Query: ${searchQuery}
                 </div>
               </div>
 
-              {/* Folders List */}
+              {/* Folders List with Auto AI Search */}
               <div className="mb-4">
-                <h4 className="text-white font-medium mb-2">Folders</h4>
+                <h4 className="text-white font-medium mb-2">Folders - Click to Auto-Load for AI Search</h4>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   <div
                     className={`flex items-center gap-3 p-2 rounded-lg border transition-colors cursor-pointer ${
@@ -1133,10 +1228,14 @@ Query: ${searchQuery}
                         ? 'bg-blue-600/20 border-blue-400' 
                         : 'bg-white/5 border-white/10 hover:bg-white/10'
                     }`}
-                    onClick={() => navigateToFolder('', 'Root Folder')}
+                    onClick={() => {
+                      navigateToFolder('', 'Root Folder');
+                      autoLoadFolderForAI('', 'Root Folder');
+                    }}
                   >
                     <Folder className="text-yellow-400" size={16} />
                     <span className="text-white text-sm">🏠 Root Folder</span>
+                    <span className="text-green-300 text-xs">Click to load for AI</span>
                   </div>
                   {driveFolders.map((folder) => (
                     <div
@@ -1146,17 +1245,42 @@ Query: ${searchQuery}
                           ? 'bg-blue-600/20 border-blue-400'
                           : 'bg-white/5 border-white/10 hover:bg-white/10'
                       }`}
-                      onClick={() => navigateToFolder(folder.id, folder.name)}
+                      onClick={() => {
+                        navigateToFolder(folder.id, folder.name);
+                        autoLoadFolderForAI(folder.id, folder.name);
+                      }}
                     >
                       <Folder className="text-yellow-400" size={16} />
                       <span className="text-white text-sm flex-1">{folder.name}</span>
                       <span className="text-blue-300 text-xs bg-blue-600/20 px-2 py-1 rounded">
                         {folder.count}
                       </span>
+                      <span className="text-green-300 text-xs">Auto AI</span>
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* Load All Files for AI Button */}
+              {driveFiles.filter(f => f.type === 'file').length > 0 && (
+                <div className="mb-4 p-3 bg-green-600/20 border border-green-400/20 rounded-lg">
+                  <h4 className="text-green-300 font-medium mb-2">🚀 Quick AI Setup</h4>
+                  <button
+                    onClick={() => {
+                      const fileIds = driveFiles.filter(f => f.type === 'file').map(f => f.id);
+                      processFilesForAISearch(fileIds, 'Current Folder');
+                    }}
+                    disabled={isProcessing}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                    Load All {driveFiles.filter(f => f.type === 'file').length} Files for AI Search
+                  </button>
+                  <p className="text-green-200 text-xs mt-2">
+                    This will automatically load all files in this folder for AI Search
+                  </p>
+                </div>
+              )}
 
               {/* File List */}
               <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -1224,7 +1348,7 @@ Query: ${searchQuery}
                 )}
               </div>
 
-              {/* Analyze Selected Files */}
+              {/* Analyze Selected Files - SIMPLIFIED */}
               {selectedFiles.size > 0 && (
                 <div className="flex items-center justify-between p-4 bg-blue-600/20 rounded-lg border border-blue-400">
                   <span className="text-white">
@@ -1232,16 +1356,15 @@ Query: ${searchQuery}
                   </span>
                   <button
                     onClick={() => {
-                      console.log('🔥 ANALYZE WITH AI BUTTON CLICKED!');
-                      console.log('Selected files:', Array.from(selectedFiles));
-                      console.log('Drive files:', driveFiles.filter(f => selectedFiles.has(f.id)));
-                      analyzeSelectedFiles();
+                      console.log('🔥 SIMPLIFIED ANALYZE WITH AI CLICKED!');
+                      const selectedFileIds = Array.from(selectedFiles);
+                      processFilesForAISearch(selectedFileIds, 'Selected Files');
                     }}
                     disabled={isProcessing}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
                   >
                     {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
-                    {isProcessing ? 'Processing...' : 'Analyze with AI'}
+                    {isProcessing ? 'Processing...' : 'Load for AI Search'}
                   </button>
                 </div>
               )}
