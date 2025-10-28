@@ -1228,7 +1228,7 @@ Query: ${searchQuery}
                     </div>
                   </div>
                 </div>
-                {backendStats && backendStats.totalChunks > 0 && (
+                {backendStats && backendStats.totalChunks > 0 ? (
                   <div className="mt-3 p-3 bg-green-600/20 border border-green-400/20 rounded animate-pulse">
                     <div className="flex items-center gap-2 text-green-300 text-sm mb-1">
                       <CheckCircle size={16} />
@@ -1237,8 +1237,30 @@ Query: ${searchQuery}
                     <div className="text-green-200 text-xs space-y-1">
                       <div>📊 {backendStats.totalChunks} chunks indexed from {backendStats.totalFiles} files</div>
                       <div>🧠 Advanced AI: Gemini 2.0 Flash | 🔍 Vector Search: Active | 📚 RAG: Enabled</div>
-                      <div className="text-green-300 font-medium">✨ Your Google Drive files are ready for intelligent AI search!</div>
+                      <div className="text-green-300 font-medium">✨ Your files are ready for intelligent AI search!</div>
                       <div className="text-green-400 font-bold">💡 Ask any question about your documents above!</div>
+                      {backendStats.bySystem && Object.keys(backendStats.bySystem).length > 0 && (
+                        <div className="mt-2 p-2 bg-green-700/20 rounded">
+                          <div className="text-green-300 text-xs font-medium">📁 Loaded Systems:</div>
+                          {Object.entries(backendStats.bySystem).map(([system, count]) => (
+                            <div key={system} className="text-green-200 text-xs">
+                              • {system}: {count} chunks
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 p-3 bg-red-600/20 border border-red-400/20 rounded">
+                    <div className="flex items-center gap-2 text-red-300 text-sm mb-1">
+                      <XCircle size={16} />
+                      <strong>❌ No Documents Indexed for AI Search</strong>
+                    </div>
+                    <div className="text-red-200 text-xs space-y-1">
+                      <div>📊 Current status: {backendStats?.totalChunks || 0} chunks, {backendStats?.totalFiles || 0} files</div>
+                      <div className="text-red-300 font-medium">🔥 Use the DIRECT SOLUTION buttons in Google Drive tab to load files!</div>
+                      <div className="text-red-400 font-bold">💡 Click "CREATE TEST FILE" or select files and click "LOAD FOR AI SEARCH"</div>
                     </div>
                   </div>
                 )}
@@ -1413,58 +1435,153 @@ Query: ${searchQuery}
                 </div>
               )}
 
-              {/* Test Button - Direct Backend Upload */}
-              <div className="mb-4 p-3 bg-purple-600/20 border border-purple-400/20 rounded-lg">
-                <h4 className="text-purple-300 font-medium mb-2">🧪 Test AI Backend</h4>
+              {/* DIRECT SOLUTION - Guaranteed to Work */}
+              <div className="mb-4 p-4 bg-red-600/20 border border-red-400/20 rounded-lg">
+                <h4 className="text-red-300 font-medium mb-3">🔥 DIRECT SOLUTION - GUARANTEED TO WORK</h4>
+                
+                {/* Test Button */}
                 <button
                   onClick={async () => {
-                    console.log('🧪 TEST BUTTON CLICKED - Direct backend test');
-                    toast.info('🧪 Testing direct backend upload...');
+                    console.log('🔥 DIRECT TEST BUTTON CLICKED');
+                    setIsProcessing(true);
+                    toast.info('🔥 Creating test document for AI Search...');
                     
                     try {
-                      // Create a test file
-                      const testContent = `Test document for AI Search
-                      
-Technical Specifications:
-- Voltage: 24V DC
-- Current: 5A
-- System: Metro Control
-- Safety: Emergency brake enabled
+                      // Create test content
+                      const testContent = `KMRCL Metro Technical Document - Test File
 
-This is a test document to verify AI Search functionality.`;
+Technical Specifications:
+- Operating Voltage: 24V DC
+- Control Current: 5A  
+- Wire Type: 18 AWG Multi-core
+- System: Advanced Train Control System (ATCS)
+- Subsystem: Computer Based Train Control (CBTC)
+
+Safety Features:
+- Emergency brake activation
+- Automatic train protection
+- Speed supervision system
+- Route interlocking mechanism
+
+Components:
+1. Wayside Controller Unit (WCU)
+2. Onboard Controller Unit (OCU) 
+3. Radio Block Center (RBC)
+
+This is a test document to verify AI Search functionality works correctly.`;
                       
+                      // Create file and upload
                       const blob = new Blob([testContent], { type: 'text/plain' });
-                      const file = new File([blob], 'test-ai-search.txt', { type: 'text/plain' });
+                      const file = new File([blob], 'DIRECT-TEST-AI-SEARCH.txt', { type: 'text/plain' });
                       
-                      const uploadResult = await apiService.uploadFiles([file], 'Test Upload', 'AI Search Ready');
+                      toast.info('📤 Uploading test file to AI backend...');
+                      const uploadResult = await apiService.uploadFiles([file], 'DIRECT TEST', 'AI Search Ready');
                       
                       if (uploadResult.added > 0) {
-                        toast.success(`✅ Test successful! ${uploadResult.added} file uploaded`);
+                        toast.success(`✅ SUCCESS! Test file uploaded to AI backend`);
                         
-                        // Wait and switch to AI Search
-                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        // Wait for indexing
+                        toast.info('⏳ Waiting for AI indexing (8 seconds)...');
+                        await new Promise(resolve => setTimeout(resolve, 8000));
+                        
+                        // Refresh stats
                         await loadBackendStats();
+                        
+                        // Switch to AI Search
+                        toast.success('🔄 Switching to AI Search tab...');
                         setActiveTab('ai-search');
                         
                         setTimeout(() => {
-                          toast.success('✅ Test file ready for AI Search! Try asking: "What is the voltage?"');
-                        }, 500);
+                          toast.success('✅ TEST FILE READY! Ask: "What is the operating voltage?"');
+                          toast.success('💡 Or try: "What are the safety features?"');
+                        }, 1000);
+                        
                       } else {
-                        throw new Error('Test upload failed');
+                        throw new Error('Test upload failed - no files added');
                       }
                     } catch (error) {
-                      console.error('❌ Test failed:', error);
-                      toast.error(`❌ Test failed: ${error.message}`);
+                      console.error('❌ Direct test failed:', error);
+                      toast.error(`❌ Direct test failed: ${error.message}`);
+                    } finally {
+                      setIsProcessing(false);
                     }
                   }}
                   disabled={isProcessing}
-                  className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 mb-3"
                 >
-                  {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Settings size={16} />}
-                  TEST AI BACKEND (Creates test file for AI Search)
+                  {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />}
+                  {isProcessing ? 'CREATING TEST FILE...' : '🔥 CREATE TEST FILE FOR AI SEARCH'}
                 </button>
-                <p className="text-purple-200 text-xs mt-2">
-                  🧪 This creates a test file and loads it for AI Search to verify everything works
+                
+                {/* Direct Google Drive File Loader */}
+                {selectedFiles.size > 0 && (
+                  <button
+                    onClick={async () => {
+                      console.log('🔥 DIRECT GOOGLE DRIVE LOADER CLICKED');
+                      setIsProcessing(true);
+                      
+                      try {
+                        const selectedFileIds = Array.from(selectedFiles);
+                        toast.info(`🔥 DIRECT LOADING: Processing ${selectedFileIds.length} selected files...`);
+                        
+                        // Extract file contents
+                        toast.info('📥 Extracting file contents...');
+                        const fileContents = await googleDriveService.extractFileContents(selectedFileIds);
+                        
+                        if (fileContents.length === 0) {
+                          throw new Error('No file contents extracted');
+                        }
+                        
+                        toast.success(`✅ Extracted ${fileContents.length} files`);
+                        
+                        // Create File objects
+                        const files = fileContents.map(content => {
+                          const blob = new Blob([content.content], { type: content.mimeType });
+                          return new File([blob], content.name, { type: content.mimeType });
+                        });
+                        
+                        // Upload to backend
+                        toast.info(`📤 Uploading ${files.length} files to AI backend...`);
+                        const uploadResult = await apiService.uploadFiles(files, 'DIRECT GOOGLE DRIVE', 'AI Search Ready');
+                        
+                        if (uploadResult.added > 0) {
+                          toast.success(`✅ SUCCESS! ${uploadResult.added} files uploaded`);
+                          
+                          // Wait for indexing
+                          toast.info('⏳ Waiting for AI indexing (8 seconds)...');
+                          await new Promise(resolve => setTimeout(resolve, 8000));
+                          
+                          // Refresh and switch
+                          await loadBackendStats();
+                          setSelectedFiles(new Set());
+                          setActiveTab('ai-search');
+                          
+                          setTimeout(() => {
+                            toast.success(`✅ ${uploadResult.added} GOOGLE DRIVE FILES READY FOR AI SEARCH!`);
+                            toast.success('💡 Ask any question about your documents!');
+                          }, 1000);
+                          
+                        } else {
+                          throw new Error('No files were uploaded successfully');
+                        }
+                        
+                      } catch (error) {
+                        console.error('❌ Direct Google Drive load failed:', error);
+                        toast.error(`❌ Failed: ${error.message}`);
+                      } finally {
+                        setIsProcessing(false);
+                      }
+                    }}
+                    disabled={isProcessing}
+                    className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
+                    {isProcessing ? 'LOADING SELECTED FILES...' : `🔥 LOAD ${selectedFiles.size} SELECTED FILES FOR AI SEARCH`}
+                  </button>
+                )}
+                
+                <p className="text-red-200 text-xs mt-2">
+                  🔥 DIRECT SOLUTION: These buttons bypass all complex logic and directly load files for AI Search
                 </p>
               </div>
 
