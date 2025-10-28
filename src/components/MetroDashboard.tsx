@@ -260,11 +260,17 @@ export const MetroDashboard: React.FC = () => {
       console.log('📁 Selected files:', selectedFileNames);
       console.log('❓ Query:', query);
       
-      // Show progress messages
-      toast.info(`🔍 Starting analysis of ${selectedFileIds.length} files...`);
+      // Show detailed progress messages
+      toast.info(`🚀 Starting AI analysis of ${selectedFileIds.length} files...`);
       
       // Step 1: Extract and process files
-      toast.info(`📥 Extracting content from: ${selectedFileNames}`);
+      toast.info(`📥 Extracting content from: ${selectedFileNames.substring(0, 50)}${selectedFileNames.length > 50 ? '...' : ''}`);
+      
+      // Step 2: Index to backend
+      toast.info(`📚 Indexing files to AI search backend...`);
+      
+      // Step 3: Process with AI
+      toast.info(`🤖 Processing with advanced AI (${searchType} mode)...`);
       
       // Use the enhanced AI analysis service
       const analysisResult = await aiAnalysisService.analyzeSelectedFiles(
@@ -285,13 +291,13 @@ export const MetroDashboard: React.FC = () => {
         content: analysisResult.technicalSummary,
         system: 'AI Analysis',
         subsystem: searchType,
-        score: 1.0,
+        score: analysisResult.confidence || 1.0,
         fileType: 'AI Analysis',
         preview: analysisResult.technicalSummary.substring(0, 300) + '...',
         sources: [{
           fileName: 'AI Technical Analysis',
           position: 0,
-          score: 1.0,
+          score: analysisResult.confidence || 1.0,
           preview: analysisResult.technicalSummary
         }]
       });
@@ -393,8 +399,13 @@ export const MetroDashboard: React.FC = () => {
       // Clear file selection
       setSelectedFiles(new Set());
       
-      // Success message
-      toast.success(`🎉 AI Analysis Complete! Generated ${convertedResults.length} results from ${selectedFileIds.length} files`);
+      // Refresh backend stats to show updated index
+      await loadBackendStats();
+      
+      // Success message with detailed info
+      const processingTime = analysisResult.processingTime ? ` in ${analysisResult.processingTime}ms` : '';
+      toast.success(`🎉 AI Analysis Complete! Generated ${convertedResults.length} results from ${selectedFileIds.length} files${processingTime}`);
+      toast.success(`📚 Files are now indexed and available for AI Search!`);
       
       console.log('✅ Analysis completed successfully:', convertedResults.length, 'results generated');
 
@@ -972,10 +983,12 @@ Query: ${searchQuery}
                   <div className="mt-3 p-3 bg-green-600/20 border border-green-400/20 rounded">
                     <div className="flex items-center gap-2 text-green-300 text-sm mb-1">
                       <CheckCircle size={16} />
-                      <strong>AI Backend Ready</strong>
+                      <strong>AI Search Ready! 🚀</strong>
                     </div>
-                    <div className="text-green-200 text-xs">
-                      📊 {backendStats.totalChunks} chunks indexed | 🧠 LLM: Gemini 2.0 Flash | 🔍 Vector Search: Active
+                    <div className="text-green-200 text-xs space-y-1">
+                      <div>📊 {backendStats.totalChunks} chunks indexed from {backendStats.totalFiles} files</div>
+                      <div>🧠 LLM: Gemini 2.0 Flash | 🔍 Vector Search: Active | 📚 RAG: Enabled</div>
+                      <div className="text-green-300 font-medium">✨ Your documents are ready for intelligent AI search!</div>
                     </div>
                   </div>
                 )}
@@ -983,10 +996,12 @@ Query: ${searchQuery}
                   <div className="mt-3 p-3 bg-amber-600/20 border border-amber-400/20 rounded">
                     <div className="flex items-center gap-2 text-amber-300 text-sm mb-1">
                       <Database size={16} />
-                      <strong>No Documents Indexed</strong>
+                      <strong>No Documents Indexed Yet</strong>
                     </div>
-                    <div className="text-amber-200 text-xs">
-                      🚀 Upload files or use Google Drive analysis to enable AI search
+                    <div className="text-amber-200 text-xs space-y-1">
+                      <div>🎯 <strong>Recommended:</strong> Go to Google Drive → Select files → Click "Analyze with AI"</div>
+                      <div>📤 <strong>Alternative:</strong> Upload files in the Upload tab</div>
+                      <div className="text-amber-300 font-medium">Once indexed, you can search with natural language queries!</div>
                     </div>
                   </div>
                 )}

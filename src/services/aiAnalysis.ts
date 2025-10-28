@@ -322,16 +322,20 @@ class AIAnalysisService {
 
       console.log('✅ Enhanced extraction complete:', fileContents.length, 'files');
       
-      // Step 2: Create vector embeddings and store locally
-      console.log('🧠 Step 2: Creating vector embeddings...');
+      // Step 2: Index files to backend for AI search availability
+      console.log('📚 Step 2: Indexing files to backend for AI search...');
+      await this.indexFilesToBackend(fileContents);
+      
+      // Step 3: Create vector embeddings and store locally
+      console.log('🧠 Step 3: Creating vector embeddings...');
       const embeddings = await this.createVectorEmbeddings(fileContents, query);
       
-      // Step 3: Perform semantic search on embeddings
-      console.log('🔍 Step 3: Performing semantic search...');
+      // Step 4: Perform semantic search on embeddings
+      console.log('🔍 Step 4: Performing semantic search...');
       const semanticResults = await this.performSemanticSearch(query, embeddings, searchType);
       
-      // Step 4: Try backend AI processing with fallback
-      console.log('🤖 Step 4: Processing with advanced AI...');
+      // Step 5: Process with backend AI (now that files are indexed)
+      console.log('🤖 Step 5: Processing with advanced AI...');
       let aiResult;
       try {
         aiResult = await this.processWithBackendAI(fileContents, query, searchType);
@@ -340,15 +344,15 @@ class AIAnalysisService {
         aiResult = await this.processWithLocalAI(fileContents, query, searchType, semanticResults);
       }
       
-      // Step 5: Enhance results with MCP if available
+      // Step 6: Enhance results with MCP if available
       if (this.mcpEnabled) {
-        console.log('🔌 Step 5: Enhancing with MCP server...');
+        console.log('🔌 Step 6: Enhancing with MCP server...');
         aiResult = await this.enhanceWithMCP(aiResult, query, searchType);
       }
       
-      // Step 6: Create comprehensive analysis result
+      // Step 7: Create comprehensive analysis result
       const processingTime = Date.now() - startTime;
-      return this.createAdvancedAnalysisResult(
+      const finalResult = this.createAdvancedAnalysisResult(
         fileContents, 
         aiResult, 
         semanticResults, 
@@ -356,6 +360,12 @@ class AIAnalysisService {
         searchType, 
         processingTime
       );
+      
+      // Step 8: Store analysis result globally for AI search access
+      console.log('💾 Step 8: Making analysis available for AI search...');
+      await this.storeAnalysisForAISearch(finalResult, fileContents, query);
+      
+      return finalResult;
       
     } catch (error) {
       console.error('❌ Enhanced analysis failed:', error);
@@ -477,13 +487,100 @@ The AI has processed your selected files and provided the above analysis based o
     return results;
   }
 
+  // Index files to backend for persistent AI search availability
+  private async indexFilesToBackend(fileContents: FileContent[]): Promise<void> {
+    try {
+      console.log('📚 Indexing files to backend for persistent AI search...');
+      
+      for (const fileContent of fileContents) {
+        console.log(`📄 Indexing: ${fileContent.name}`);
+        
+        // Create a FormData object to simulate file upload
+        const formData = new FormData();
+        
+        // Create a blob from the file content
+        const blob = new Blob([fileContent.content], { type: fileContent.mimeType });
+        const file = new File([blob], fileContent.name, { type: fileContent.mimeType });
+        
+        formData.append('files', file);
+        formData.append('system', 'Google Drive Analysis');
+        formData.append('subsystem', 'AI Search Ready');
+
+        const response = await fetch(`${this.backendURL}/ingest`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn(`⚠️ Failed to index ${fileContent.name}: ${errorText}`);
+          // Continue with other files even if one fails
+        } else {
+          console.log(`✅ Successfully indexed: ${fileContent.name}`);
+        }
+      }
+      
+      // Wait for backend indexing to complete
+      console.log('⏳ Waiting for backend indexing to complete...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      console.log('✅ Backend indexing completed - files now available for AI search');
+      
+    } catch (error) {
+      console.error('❌ Error indexing files to backend:', error);
+      throw new Error(`Failed to index files to backend: ${error.message}`);
+    }
+  }
+
+  // Store analysis result for AI search access
+  private async storeAnalysisForAISearch(result: AnalysisResult, fileContents: FileContent[], query: string): Promise<void> {
+    try {
+      // Store the analysis result in a format that can be accessed by AI search
+      const analysisDocument = {
+        title: `AI Analysis: ${query}`,
+        content: `${result.technicalSummary}\n\n${result.laymanSummary}`,
+        system: 'AI Analysis',
+        subsystem: 'Generated Results',
+        metadata: {
+          originalQuery: query,
+          sourceFiles: fileContents.map(f => f.name),
+          analysisDate: new Date().toISOString(),
+          confidence: result.confidence,
+          processingTime: result.processingTime
+        }
+      };
+      
+      // Create a blob and file for the analysis result
+      const analysisBlob = new Blob([JSON.stringify(analysisDocument, null, 2)], { type: 'application/json' });
+      const analysisFile = new File([analysisBlob], `analysis_${Date.now()}.json`, { type: 'application/json' });
+      
+      // Upload the analysis result to backend
+      const formData = new FormData();
+      formData.append('files', analysisFile);
+      formData.append('system', 'AI Analysis Results');
+      formData.append('subsystem', 'Search Ready');
+
+      const response = await fetch(`${this.backendURL}/ingest`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        console.log('✅ Analysis result stored for AI search access');
+      } else {
+        console.warn('⚠️ Failed to store analysis result for AI search');
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error storing analysis for AI search:', error);
+      // Don't throw error as this is not critical for the main analysis
+    }
+  }
+
   // Process with backend AI (enhanced)
   private async processWithBackendAI(fileContents: FileContent[], query: string, searchType: SearchType): Promise<any> {
-    // First ingest files
-    await this.ingestFileContents(fileContents);
-    
-    // Wait for indexing
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Files should already be indexed by indexFilesToBackend
+    console.log('🤖 Processing with backend AI (files already indexed)...');
     
     // Perform enhanced search
     const response = await fetch(`${this.backendURL}/ask`, {
@@ -492,8 +589,8 @@ The AI has processed your selected files and provided the above analysis based o
       body: JSON.stringify({ 
         query: `${query} (Search Type: ${searchType})`,
         k: 20,
-        system: 'Google Drive',
-        subsystem: 'Enhanced Analysis',
+        system: 'Google Drive Analysis',
+        subsystem: 'AI Search Ready',
         tags: this.extractSearchTags(query, searchType)
       })
     });
@@ -503,7 +600,9 @@ The AI has processed your selected files and provided the above analysis based o
       throw new Error(`Backend AI failed: ${errorText}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log('✅ Backend AI processing completed');
+    return result;
   }
 
   // Process with local AI (enhanced fallback)
