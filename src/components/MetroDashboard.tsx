@@ -247,6 +247,7 @@ export const MetroDashboard: React.FC = () => {
     }
 
     setIsProcessing(true);
+    
     try {
       const selectedFileIds = Array.from(selectedFiles);
       const selectedFileNames = driveFiles
@@ -256,132 +257,90 @@ export const MetroDashboard: React.FC = () => {
       
       const query = searchQuery || 'Analyze these selected documents for technical specifications and details';
       
-      console.log('🔍 Starting AI analysis...');
+      console.log('🔍 Starting SIMPLIFIED AI analysis...');
       console.log('📁 Selected files:', selectedFileNames);
       console.log('❓ Query:', query);
       
-      // Show detailed progress messages
-      toast.info(`🚀 Starting AI analysis of ${selectedFileIds.length} files...`);
+      // Step 1: Show initial progress
+      toast.info(`🚀 Starting analysis of ${selectedFileIds.length} files...`);
       
-      // Step 1: Extract and process files
-      toast.info(`📥 Extracting content from: ${selectedFileNames.substring(0, 50)}${selectedFileNames.length > 50 ? '...' : ''}`);
+      // Step 2: Extract file contents directly
+      console.log('📥 Extracting file contents...');
+      toast.info(`📥 Extracting content from selected files...`);
       
-      // Step 2: Index to backend
-      toast.info(`📚 Indexing files to AI search backend (this makes them available for AI Search)...`);
+      const fileContents = await googleDriveService.extractFileContents(selectedFileIds);
       
-      // Step 3: Process with AI
-      toast.info(`🤖 Processing with advanced AI (${searchType} mode)...`);
+      if (fileContents.length === 0) {
+        throw new Error('No file contents could be extracted from the selected files');
+      }
       
-      // Step 4: Verification
-      toast.info(`🔍 Verifying files are indexed and ready for AI Search...`);
+      console.log('✅ File contents extracted:', fileContents.length, 'files');
       
-      // Use the enhanced AI analysis service
-      const analysisResult = await aiAnalysisService.analyzeSelectedFiles(
-        selectedFileIds,
-        query,
-        searchType
-      );
-
-      console.log('✅ Analysis result received:', analysisResult);
-
-      // Convert analysis result to display format
+      // Step 3: Upload files directly to backend for indexing
+      console.log('📚 Uploading files to backend for indexing...');
+      toast.info(`📚 Indexing ${fileContents.length} files to backend for AI Search...`);
+      
+      const files: File[] = fileContents.map(content => {
+        const blob = new Blob([content.content], { type: content.mimeType });
+        return new File([blob], content.name, { type: content.mimeType });
+      });
+      
+      const uploadResult = await apiService.uploadFiles(files, 'Google Drive Analysis', 'AI Search Ready');
+      console.log('✅ Upload result:', uploadResult);
+      
+      if (uploadResult.added === 0) {
+        throw new Error('No files were successfully uploaded to the backend');
+      }
+      
+      // Step 4: Wait for indexing
+      console.log('⏳ Waiting for backend indexing...');
+      toast.info(`⏳ Waiting for backend to index ${uploadResult.added} files...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Step 5: Perform AI search on the uploaded content
+      console.log('🤖 Performing AI search on indexed content...');
+      toast.info(`🤖 Performing AI analysis with ${searchType} mode...`);
+      
+      const searchResult = await apiService.search(query, {
+        k: 15,
+        system: 'Google Drive Analysis',
+        subsystem: 'AI Search Ready'
+      });
+      
+      console.log('✅ AI search completed:', searchResult);
+      
+      // Step 6: Convert results to display format
       const convertedResults: SearchResult[] = [];
       
-      // Add the main technical analysis result
-      convertedResults.push({
-        id: 'analysis_technical',
-        title: `🤖 AI Technical Analysis - ${searchType.toUpperCase()}`,
-        content: analysisResult.technicalSummary,
-        system: 'AI Analysis',
-        subsystem: searchType,
-        score: analysisResult.confidence || 1.0,
-        fileType: 'AI Analysis',
-        preview: analysisResult.technicalSummary.substring(0, 300) + '...',
-        sources: [{
-          fileName: 'AI Technical Analysis',
-          position: 0,
-          score: analysisResult.confidence || 1.0,
-          preview: analysisResult.technicalSummary
-        }]
-      });
-
-      // Add layman summary if available
-      if (analysisResult.laymanSummary && analysisResult.laymanSummary !== analysisResult.technicalSummary) {
+      // Add AI response as main result
+      if (searchResult.result && searchResult.result.trim()) {
         convertedResults.push({
-          id: 'analysis_summary',
-          title: '📋 Simplified Summary',
-          content: analysisResult.laymanSummary,
+          id: 'ai_analysis_main',
+          title: `🤖 AI Analysis Results - ${searchType.toUpperCase()}`,
+          content: searchResult.result,
           system: 'AI Analysis',
-          subsystem: 'Summary',
-          score: 0.95,
-          fileType: 'Summary',
-          preview: analysisResult.laymanSummary,
+          subsystem: searchType,
+          score: 1.0,
+          fileType: 'AI Analysis',
+          preview: searchResult.result.substring(0, 300) + (searchResult.result.length > 300 ? '...' : ''),
           sources: [{
-            fileName: 'Simplified Summary',
+            fileName: 'AI Generated Analysis',
             position: 0,
-            score: 0.95,
-            preview: analysisResult.laymanSummary
+            score: 1.0,
+            preview: searchResult.result
           }]
         });
       }
-
-      // Add wire details if found
-      if (analysisResult.wireDetails && analysisResult.wireDetails.length > 0) {
-        const wireContent = analysisResult.wireDetails.map(wire => 
-          `Wire ${wire.id}: ${wire.spec} (${wire.from} → ${wire.to}) - ${wire.voltage}, ${wire.current}`
-        ).join('\n');
-        
-        convertedResults.push({
-          id: 'analysis_wires',
-          title: '⚡ Wire & Cable Details',
-          content: wireContent,
-          system: 'Technical Analysis',
-          subsystem: 'Wiring',
-          score: 0.9,
-          fileType: 'Wire Details',
-          preview: wireContent,
-          sources: [{
-            fileName: 'Wire Analysis',
-            position: 0,
-            score: 0.9,
-            preview: wireContent
-          }]
-        });
-      }
-
-      // Add component details if found
-      if (analysisResult.components && analysisResult.components.length > 0) {
-        const componentContent = analysisResult.components.map(comp => 
-          `${comp.name} (${comp.type}) - Location: ${comp.location} - Specs: ${JSON.stringify(comp.specs)}`
-        ).join('\n');
-        
-        convertedResults.push({
-          id: 'analysis_components',
-          title: '🔧 Component Analysis',
-          content: componentContent,
-          system: 'Technical Analysis',
-          subsystem: 'Components',
-          score: 0.9,
-          fileType: 'Components',
-          preview: componentContent,
-          sources: [{
-            fileName: 'Component Analysis',
-            position: 0,
-            score: 0.9,
-            preview: componentContent
-          }]
-        });
-      }
-
-      // Add source documents
-      if (analysisResult.sources && analysisResult.sources.length > 0) {
-        analysisResult.sources.forEach((source, index) => {
+      
+      // Add source documents from search results
+      if (searchResult.sources && searchResult.sources.length > 0) {
+        searchResult.sources.forEach((source, index) => {
           convertedResults.push({
             id: `source_${index}`,
             title: `📄 ${source.fileName}`,
             content: source.preview,
-            system: 'Source Document',
-            subsystem: 'Google Drive',
+            system: source.system || 'Source Document',
+            subsystem: source.subsystem || 'Google Drive',
             score: source.score,
             fileType: 'Document',
             preview: source.preview,
@@ -394,35 +353,54 @@ export const MetroDashboard: React.FC = () => {
           });
         });
       }
-
-      // Update results and switch to results tab
+      
+      // Add file content summaries
+      fileContents.forEach((file, index) => {
+        convertedResults.push({
+          id: `file_content_${index}`,
+          title: `📋 ${file.name} - Content Summary`,
+          content: file.content.substring(0, 1000) + (file.content.length > 1000 ? '...' : ''),
+          system: 'File Content',
+          subsystem: 'Google Drive',
+          score: 0.8,
+          fileType: file.mimeType,
+          preview: file.content.substring(0, 300) + (file.content.length > 300 ? '...' : ''),
+          sources: [{
+            fileName: file.name,
+            position: 0,
+            score: 0.8,
+            preview: file.content.substring(0, 300) + '...'
+          }]
+        });
+      });
+      
+      // Step 7: Update UI and show results
       setResults(convertedResults);
       setActiveTab('results');
-      
-      // Clear file selection
       setSelectedFiles(new Set());
       
-      // Refresh backend stats to show updated index
+      // Step 8: Refresh backend stats
       await loadBackendStats();
       
-      // Verify documents are actually indexed
-      if (backendStats && backendStats.totalChunks > 0) {
-        toast.success(`✅ VERIFIED: ${backendStats.totalChunks} chunks indexed from ${backendStats.totalFiles} files`);
-      } else {
-        toast.warning(`⚠️ Warning: Backend stats not updated yet. Files may still be processing.`);
-      }
+      // Step 9: Success messages
+      toast.success(`🎉 Analysis Complete! Processed ${uploadResult.added} files successfully`);
+      toast.success(`📚 Files are now indexed and available for AI Search!`);
+      toast.success(`🔍 Go to AI Search tab to ask questions about your documents!`);
       
-      // Success message with detailed info
-      const processingTime = analysisResult.processingTime ? ` in ${analysisResult.processingTime}ms` : '';
-      toast.success(`🎉 AI Analysis Complete! Generated ${convertedResults.length} results from ${selectedFileIds.length} files${processingTime}`);
-      toast.success(`📚 SUCCESS: Files are now indexed and available for AI Search!`);
-      toast.success(`🔍 You can now go to AI Search tab and ask questions about these documents!`);
+      console.log('✅ SIMPLIFIED analysis completed successfully');
       
-      console.log('✅ Analysis completed successfully:', convertedResults.length, 'results generated');
-
     } catch (error: any) {
-      console.error('❌ Analysis failed:', error);
+      console.error('❌ SIMPLIFIED analysis failed:', error);
       toast.error(`❌ Analysis failed: ${error.message}`);
+      
+      // Show helpful error guidance
+      if (error.message.includes('extract')) {
+        toast.error('💡 Try selecting different file types (PDF, DOC, TXT)');
+      } else if (error.message.includes('upload')) {
+        toast.error('💡 Check your internet connection and try again');
+      } else {
+        toast.error('💡 Try refreshing the page and selecting files again');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -1215,12 +1193,17 @@ Query: ${searchQuery}
                     {selectedFiles.size} file(s) selected
                   </span>
                   <button
-                    onClick={analyzeSelectedFiles}
+                    onClick={() => {
+                      console.log('🔥 ANALYZE WITH AI BUTTON CLICKED!');
+                      console.log('Selected files:', Array.from(selectedFiles));
+                      console.log('Drive files:', driveFiles.filter(f => selectedFiles.has(f.id)));
+                      analyzeSelectedFiles();
+                    }}
                     disabled={isProcessing}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
                   >
                     {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
-                    Analyze with AI
+                    {isProcessing ? 'Processing...' : 'Analyze with AI'}
                   </button>
                 </div>
               )}
