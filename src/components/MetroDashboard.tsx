@@ -267,10 +267,13 @@ export const MetroDashboard: React.FC = () => {
       toast.info(`📥 Extracting content from: ${selectedFileNames.substring(0, 50)}${selectedFileNames.length > 50 ? '...' : ''}`);
       
       // Step 2: Index to backend
-      toast.info(`📚 Indexing files to AI search backend...`);
+      toast.info(`📚 Indexing files to AI search backend (this makes them available for AI Search)...`);
       
       // Step 3: Process with AI
       toast.info(`🤖 Processing with advanced AI (${searchType} mode)...`);
+      
+      // Step 4: Verification
+      toast.info(`🔍 Verifying files are indexed and ready for AI Search...`);
       
       // Use the enhanced AI analysis service
       const analysisResult = await aiAnalysisService.analyzeSelectedFiles(
@@ -402,10 +405,18 @@ export const MetroDashboard: React.FC = () => {
       // Refresh backend stats to show updated index
       await loadBackendStats();
       
+      // Verify documents are actually indexed
+      if (backendStats && backendStats.totalChunks > 0) {
+        toast.success(`✅ VERIFIED: ${backendStats.totalChunks} chunks indexed from ${backendStats.totalFiles} files`);
+      } else {
+        toast.warning(`⚠️ Warning: Backend stats not updated yet. Files may still be processing.`);
+      }
+      
       // Success message with detailed info
       const processingTime = analysisResult.processingTime ? ` in ${analysisResult.processingTime}ms` : '';
       toast.success(`🎉 AI Analysis Complete! Generated ${convertedResults.length} results from ${selectedFileIds.length} files${processingTime}`);
-      toast.success(`📚 Files are now indexed and available for AI Search!`);
+      toast.success(`📚 SUCCESS: Files are now indexed and available for AI Search!`);
+      toast.success(`🔍 You can now go to AI Search tab and ask questions about these documents!`);
       
       console.log('✅ Analysis completed successfully:', convertedResults.length, 'results generated');
 

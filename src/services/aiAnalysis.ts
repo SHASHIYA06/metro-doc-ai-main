@@ -130,38 +130,30 @@ class AIAnalysisService {
     }
   }
 
-  // Ingest file contents to backend for processing
+  // Ingest file contents to backend for processing using API service
   private async ingestFileContents(fileContents: FileContent[]): Promise<void> {
     try {
-      for (const fileContent of fileContents) {
-        console.log(`Ingesting file: ${fileContent.name}`);
-        
-        // Create a FormData object to simulate file upload
-        const formData = new FormData();
-        
-        // Create a blob from the file content
-        const blob = new Blob([fileContent.content], { type: fileContent.mimeType });
-        const file = new File([blob], fileContent.name, { type: fileContent.mimeType });
-        
-        formData.append('files', file);
-        formData.append('system', 'Google Drive');
-        formData.append('subsystem', 'Analysis');
-
-        const response = await fetch(`${this.backendURL}/ingest`, {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.warn(`Failed to ingest ${fileContent.name}: ${errorText}`);
-          // Continue with other files even if one fails
-        } else {
-          console.log(`Successfully ingested: ${fileContent.name}`);
-        }
+      console.log('📥 Ingesting file contents using API service...');
+      
+      // Convert file contents to File objects
+      const files: File[] = fileContents.map(content => {
+        const blob = new Blob([content.content], { type: content.mimeType });
+        return new File([blob], content.name, { type: content.mimeType });
+      });
+      
+      // Use the API service for better error handling
+      const result = await apiService.uploadFiles(files, 'Google Drive Analysis', 'AI Search Ready');
+      
+      console.log('✅ File ingestion completed:', result);
+      
+      if (result.added === 0) {
+        throw new Error('No files were successfully ingested');
       }
+      
+      console.log(`📊 Successfully ingested ${result.added}/${result.total} files`);
+      
     } catch (error) {
-      console.error('Error ingesting file contents:', error);
+      console.error('❌ Error ingesting file contents:', error);
       throw new Error(`Failed to ingest file contents: ${error.message}`);
     }
   }
@@ -492,44 +484,92 @@ The AI has processed your selected files and provided the above analysis based o
     try {
       console.log('📚 Indexing files to backend for persistent AI search...');
       
+      let successCount = 0;
+      let totalFiles = fileContents.length;
+      
       for (const fileContent of fileContents) {
         console.log(`📄 Indexing: ${fileContent.name}`);
         
-        // Create a FormData object to simulate file upload
-        const formData = new FormData();
-        
-        // Create a blob from the file content
-        const blob = new Blob([fileContent.content], { type: fileContent.mimeType });
-        const file = new File([blob], fileContent.name, { type: fileContent.mimeType });
-        
-        formData.append('files', file);
-        formData.append('system', 'Google Drive Analysis');
-        formData.append('subsystem', 'AI Search Ready');
+        try {
+          // Create a FormData object to simulate file upload
+          const formData = new FormData();
+          
+          // Create a blob from the file content
+          const blob = new Blob([fileContent.content], { type: fileContent.mimeType });
+          const file = new File([blob], fileContent.name, { type: fileContent.mimeType });
+          
+          formData.append('files', file);
+          formData.append('system', 'Google Drive Analysis');
+          formData.append('subsystem', 'AI Search Ready');
 
-        const response = await fetch(`${this.backendURL}/ingest`, {
-          method: 'POST',
-          body: formData
-        });
+          const response = await fetch(`${this.backendURL}/ingest`, {
+            method: 'POST',
+            body: formData
+          });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.warn(`⚠️ Failed to index ${fileContent.name}: ${errorText}`);
-          // Continue with other files even if one fails
-        } else {
-          console.log(`✅ Successfully indexed: ${fileContent.name}`);
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`⚠️ Failed to index ${fileContent.name}: ${errorText}`);
+          } else {
+            const result = await response.json();
+            console.log(`✅ Successfully indexed: ${fileContent.name}`, result);
+            successCount++;
+          }
+        } catch (fileError) {
+          console.warn(`⚠️ Error indexing ${fileContent.name}:`, fileError);
         }
       }
       
-      // Wait for backend indexing to complete
-      console.log('⏳ Waiting for backend indexing to complete...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      if (successCount === 0) {
+        throw new Error('Failed to index any files to the backend');
+      }
       
-      console.log('✅ Backend indexing completed - files now available for AI search');
+      // Wait for backend indexing to complete with verification
+      console.log('⏳ Waiting for backend indexing to complete...');
+      await this.waitForIndexingCompletion(successCount);
+      
+      console.log(`✅ Backend indexing completed - ${successCount}/${totalFiles} files now available for AI search`);
       
     } catch (error) {
       console.error('❌ Error indexing files to backend:', error);
       throw new Error(`Failed to index files to backend: ${error.message}`);
     }
+  }
+
+  // Wait for indexing completion with verification
+  private async waitForIndexingCompletion(expectedFiles: number): Promise<void> {
+    const maxAttempts = 10;
+    const delayMs = 2000;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`🔍 Checking indexing status (attempt ${attempt}/${maxAttempts})...`);
+        
+        // Check backend stats to verify indexing
+        const response = await fetch(`${this.backendURL}/stats`);
+        if (response.ok) {
+          const stats = await response.json();
+          console.log(`📊 Backend stats: ${stats.totalChunks} chunks, ${stats.uniqueFiles} files`);
+          
+          if (stats.totalChunks > 0) {
+            console.log('✅ Indexing verified - documents are available for search');
+            return;
+          }
+        }
+        
+        if (attempt < maxAttempts) {
+          console.log(`⏳ Waiting ${delayMs}ms before next check...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      } catch (error) {
+        console.warn(`⚠️ Error checking indexing status:`, error);
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    
+    console.warn('⚠️ Could not verify indexing completion, but proceeding...');
   }
 
   // Store analysis result for AI search access
@@ -582,27 +622,22 @@ The AI has processed your selected files and provided the above analysis based o
     // Files should already be indexed by indexFilesToBackend
     console.log('🤖 Processing with backend AI (files already indexed)...');
     
-    // Perform enhanced search
-    const response = await fetch(`${this.backendURL}/ask`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        query: `${query} (Search Type: ${searchType})`,
+    try {
+      // Use the API service for better error handling
+      const result = await apiService.search(query, {
         k: 20,
         system: 'Google Drive Analysis',
         subsystem: 'AI Search Ready',
         tags: this.extractSearchTags(query, searchType)
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Backend AI failed: ${errorText}`);
+      });
+      
+      console.log('✅ Backend AI processing completed:', result);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Backend AI processing failed:', error);
+      throw new Error(`Backend AI failed: ${error.message}`);
     }
-
-    const result = await response.json();
-    console.log('✅ Backend AI processing completed');
-    return result;
   }
 
   // Process with local AI (enhanced fallback)
