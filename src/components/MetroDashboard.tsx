@@ -374,20 +374,30 @@ export const MetroDashboard: React.FC = () => {
         });
       });
       
-      // Step 7: Update UI and show results
+      // Step 7: Store results for later access
       setResults(convertedResults);
-      setActiveTab('results');
       setSelectedFiles(new Set());
       
-      // Step 8: Refresh backend stats
+      // Step 8: Refresh backend stats to show updated index
       await loadBackendStats();
       
-      // Step 9: Success messages
+      // Step 9: AUTOMATICALLY SWITCH TO AI SEARCH TAB (as requested)
+      console.log('🔄 Automatically switching to AI Search tab...');
       toast.success(`🎉 Analysis Complete! Processed ${uploadResult.added} files successfully`);
       toast.success(`📚 Files are now indexed and available for AI Search!`);
-      toast.success(`🔍 Go to AI Search tab to ask questions about your documents!`);
+      toast.success(`🔄 Automatically switching to AI Search tab...`);
       
-      console.log('✅ SIMPLIFIED analysis completed successfully');
+      // Wait a moment for user to see the success message
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // SWITCH TO AI SEARCH TAB AUTOMATICALLY
+      setActiveTab('ai-search');
+      
+      // Show final success message in AI Search tab
+      toast.success(`✅ Ready! Your ${uploadResult.added} files are now available for AI Search!`);
+      toast.success(`💡 Ask any question about your documents in the search box above!`);
+      
+      console.log('✅ ANALYSIS COMPLETE - Switched to AI Search tab automatically');
       
     } catch (error: any) {
       console.error('❌ SIMPLIFIED analysis failed:', error);
@@ -468,12 +478,27 @@ Your query "${searchQuery}" will work great once you have documents loaded!`,
         return;
       }
 
-      // Proceed with normal search
+      // Proceed with ADVANCED AI search using all features
+      console.log('🚀 Using advanced AI search with all features...');
+      toast.info(`🧠 Processing with advanced AI (${searchType} mode)...`);
+      
+      // Extract search tags for better results
+      const searchTags = [];
+      if (/wire|cable|connect/i.test(searchQuery)) searchTags.push('wiring');
+      if (/safety|emergency/i.test(searchQuery)) searchTags.push('safety');
+      if (/voltage|current|power/i.test(searchQuery)) searchTags.push('electrical');
+      if (/control|system/i.test(searchQuery)) searchTags.push('control');
+      if (/motor|drive/i.test(searchQuery)) searchTags.push('traction');
+      searchTags.push(searchType);
+      
       const response = await apiService.search(searchQuery, { 
-        k: 15,
-        system: systemFilter,
-        subsystem: subsystemFilter
+        k: 20, // More results for better analysis
+        system: systemFilter || 'Google Drive Analysis',
+        subsystem: subsystemFilter || 'AI Search Ready',
+        tags: searchTags
       });
+      
+      console.log('✅ Advanced AI search completed:', response);
       
       const convertedResults: SearchResult[] = response.sources.map(source => ({
         id: source.ref.toString(),
@@ -517,7 +542,8 @@ Your query "${searchQuery}" will work great once you have documents loaded!`,
       setActiveTab('results');
       
       if (convertedResults.length > 0) {
-        toast.success(`🎉 Found ${convertedResults.length} relevant results using ${searchType} search`);
+        toast.success(`🎉 Found ${convertedResults.length} relevant results using advanced ${searchType} AI search`);
+        toast.success(`🧠 Used: Gemini 2.0 Flash + Vector Search + RAG + Semantic Analysis`);
       } else {
         toast.info('No results found. Try different keywords or check if documents are properly indexed.');
       }
@@ -969,15 +995,16 @@ Query: ${searchQuery}
                   </div>
                 </div>
                 {backendStats && backendStats.totalChunks > 0 && (
-                  <div className="mt-3 p-3 bg-green-600/20 border border-green-400/20 rounded">
+                  <div className="mt-3 p-3 bg-green-600/20 border border-green-400/20 rounded animate-pulse">
                     <div className="flex items-center gap-2 text-green-300 text-sm mb-1">
                       <CheckCircle size={16} />
-                      <strong>AI Search Ready! 🚀</strong>
+                      <strong>🚀 AI Search Ready - Documents Loaded!</strong>
                     </div>
                     <div className="text-green-200 text-xs space-y-1">
                       <div>📊 {backendStats.totalChunks} chunks indexed from {backendStats.totalFiles} files</div>
-                      <div>🧠 LLM: Gemini 2.0 Flash | 🔍 Vector Search: Active | 📚 RAG: Enabled</div>
-                      <div className="text-green-300 font-medium">✨ Your documents are ready for intelligent AI search!</div>
+                      <div>🧠 Advanced AI: Gemini 2.0 Flash | 🔍 Vector Search: Active | 📚 RAG: Enabled</div>
+                      <div className="text-green-300 font-medium">✨ Your Google Drive files are ready for intelligent AI search!</div>
+                      <div className="text-green-400 font-bold">💡 Ask any question about your documents above!</div>
                     </div>
                   </div>
                 )}
