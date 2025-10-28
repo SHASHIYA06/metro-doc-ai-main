@@ -1,0 +1,85 @@
+{
+  "mcpServers": {
+    "metro-doc-analyzer": {
+      "command": "uvx",
+      "args": ["metro-document-analyzer@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "INFO",
+        "METRO_API_URL": "https://metro-doc-ai-main.onrender.com",
+        "GOOGLE_DRIVE_ENABLED": "true"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "analyze_document",
+        "extract_specifications",
+        "search_technical_data",
+        "generate_summary"
+      ]
+    },
+    "document-intelligence": {
+      "command": "uvx",
+      "args": ["document-intelligence-mcp@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "INFO",
+        "OCR_ENABLED": "true",
+        "PDF_PROCESSING": "true"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "extract_text",
+        "process_pdf",
+        "ocr_image",
+        "analyze_structure"
+      ]
+    },
+    "vector-search": {
+      "command": "uvx",
+      "args": ["vector-search-mcp@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "INFO",
+        "EMBEDDING_MODEL": "text-embedding-004",
+        "VECTOR_DB": "local"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "create_embeddings",
+        "semantic_search",
+        "similarity_search",
+        "cluster_documents"
+      ]
+    },
+    "llm-ensemble": {
+      "command": "uvx",
+      "args": ["llm-ensemble-mcp@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "INFO",
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "generate_response",
+        "ensemble_analysis",
+        "compare_models",
+        "optimize_prompt"
+      ]
+    },
+    "metro-systems": {
+      "command": "uvx",
+      "args": ["metro-systems-knowledge@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "INFO",
+        "KNOWLEDGE_BASE": "metro_railway_systems",
+        "SAFETY_STANDARDS": "IEC_62267"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "get_safety_standards",
+        "lookup_specifications",
+        "validate_compliance",
+        "generate_recommendations"
+      ]
+    }
+  }
+}

@@ -414,7 +414,66 @@ export const MetroDashboard: React.FC = () => {
 
     setIsProcessing(true);
     try {
-      const response = await apiService.search(searchQuery, { k: 15 });
+      console.log('🔍 Starting enhanced AI search...');
+      console.log('Query:', searchQuery);
+      console.log('Search type:', searchType);
+      
+      // Check if we have indexed documents
+      if (!backendStats || backendStats.totalChunks === 0) {
+        console.warn('No documents indexed, suggesting alternative approach');
+        
+        // Create a helpful result explaining the situation
+        const helpResult: SearchResult = {
+          id: 'help_no_documents',
+          title: '🤖 AI Search Assistant - No Documents Indexed',
+          content: `I'm ready to help you search and analyze documents, but I don't have any documents indexed yet.
+
+Here's how to get started:
+
+**🎯 Recommended Approach:**
+1. Go to the "Google Drive" tab
+2. Select the files you want to analyze
+3. Click "Analyze with AI" for instant results
+
+**📤 Alternative Approach:**
+1. Go to the "Upload" tab
+2. Upload your documents (PDF, Word, Excel, etc.)
+3. Wait for processing to complete
+4. Return here to search the indexed content
+
+**💡 What I can do once you have documents:**
+- Answer technical questions about your files
+- Extract specifications and requirements
+- Find wiring and component details
+- Compare different systems
+- Generate summaries and insights
+
+Your query "${searchQuery}" will work great once you have documents loaded!`,
+          system: 'AI Assistant',
+          subsystem: 'Help',
+          score: 1.0,
+          fileType: 'Guide',
+          preview: 'No documents indexed yet. Here\'s how to get started with AI search...',
+          sources: [{
+            fileName: 'AI Search Guide',
+            position: 0,
+            score: 1.0,
+            preview: 'Step-by-step guide to using AI search effectively'
+          }]
+        };
+
+        setResults([helpResult]);
+        setActiveTab('results');
+        toast.info('💡 No documents indexed yet. Check the results for guidance on how to get started.');
+        return;
+      }
+
+      // Proceed with normal search
+      const response = await apiService.search(searchQuery, { 
+        k: 15,
+        system: systemFilter,
+        subsystem: subsystemFilter
+      });
       
       const convertedResults: SearchResult[] = response.sources.map(source => ({
         id: source.ref.toString(),
@@ -423,7 +482,7 @@ export const MetroDashboard: React.FC = () => {
         system: source.system,
         subsystem: source.subsystem,
         score: source.score,
-        fileType: 'PDF',
+        fileType: source.metadata?.mimeType || 'Document',
         preview: source.preview,
         sources: [{
           fileName: source.fileName,
@@ -433,16 +492,67 @@ export const MetroDashboard: React.FC = () => {
         }]
       }));
 
+      // Add the AI response as the first result if available
+      if (response.result && response.result.trim()) {
+        const aiResult: SearchResult = {
+          id: 'ai_response',
+          title: `🤖 AI Analysis - ${searchType.toUpperCase()}`,
+          content: response.result,
+          system: 'AI Response',
+          subsystem: searchType,
+          score: 1.0,
+          fileType: 'AI Analysis',
+          preview: response.result.substring(0, 300) + (response.result.length > 300 ? '...' : ''),
+          sources: [{
+            fileName: 'AI Generated Response',
+            position: 0,
+            score: 1.0,
+            preview: response.result
+          }]
+        };
+        convertedResults.unshift(aiResult);
+      }
+
       setResults(convertedResults);
       setActiveTab('results');
-      toast.success(`Found ${convertedResults.length} relevant results`);
+      
+      if (convertedResults.length > 0) {
+        toast.success(`🎉 Found ${convertedResults.length} relevant results using ${searchType} search`);
+      } else {
+        toast.info('No results found. Try different keywords or check if documents are properly indexed.');
+      }
+      
     } catch (error: any) {
       console.error('Search failed:', error);
       
       if (error.message.includes('Index is empty') || error.message.includes('Ingest files first')) {
-        toast.error('No documents in the system. Please upload files first or select files from Google Drive to analyze.');
+        // Create helpful error result
+        const errorResult: SearchResult = {
+          id: 'error_no_index',
+          title: '⚠️ Search Error - Empty Index',
+          content: `The search index is currently empty. This means no documents have been processed yet.
+
+**To fix this:**
+1. Upload documents using the Upload tab, OR
+2. Use Google Drive integration to analyze files directly
+
+**Your search query:** "${searchQuery}"
+**Search type:** ${searchType}
+
+Once you have documents indexed, this search will work perfectly!`,
+          system: 'Error Handler',
+          subsystem: 'Index',
+          score: 0.5,
+          fileType: 'Error',
+          preview: 'Search index is empty. Upload documents to enable search.',
+          sources: []
+        };
+        
+        setResults([errorResult]);
+        setActiveTab('results');
+        toast.error('📭 No documents indexed. Upload files or use Google Drive analysis first.');
       } else {
-        toast.error(`Search failed: ${error.message}`);
+        toast.error(`❌ Search failed: ${error.message}`);
       }
     } finally {
       setIsProcessing(false);
@@ -844,20 +954,40 @@ Query: ${searchQuery}
               </div>
 
               <div className="bg-blue-600/10 border border-blue-400/20 rounded-lg p-4">
-                <h4 className="text-blue-300 font-medium mb-2">💡 How to use AI Search:</h4>
-                <div className="text-blue-200 text-sm space-y-1">
-                  <p><strong>Recommended:</strong> Go to Google Drive tab → Select files → Click "Analyze with AI"</p>
-                  <p><strong>Alternative:</strong> Upload documents first, then search the indexed content here</p>
-                  <p><strong>Example queries:</strong> "What are the voltage requirements?" or "Show me signaling specifications"</p>
+                <h4 className="text-blue-300 font-medium mb-2">🤖 Enhanced AI Search with RAG:</h4>
+                <div className="text-blue-200 text-sm space-y-2">
+                  <p><strong>🎯 Best Method:</strong> Go to Google Drive tab → Select files → Click "Analyze with AI"</p>
+                  <p><strong>🔍 Direct Search:</strong> Upload documents first, then search the indexed content here</p>
+                  <p><strong>💡 Smart Queries:</strong> "Analyze voltage requirements", "Compare signaling systems", "Extract wire specifications"</p>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="p-2 bg-purple-600/20 rounded text-xs">
+                      <strong>Semantic Search:</strong> Natural language understanding
+                    </div>
+                    <div className="p-2 bg-green-600/20 rounded text-xs">
+                      <strong>RAG Processing:</strong> Context-aware responses
+                    </div>
+                  </div>
                 </div>
                 {backendStats && backendStats.totalChunks > 0 && (
-                  <div className="mt-2 p-2 bg-green-600/20 border border-green-400/20 rounded text-green-300 text-sm">
-                    ✅ Backend has {backendStats.totalChunks} indexed chunks ready for search
+                  <div className="mt-3 p-3 bg-green-600/20 border border-green-400/20 rounded">
+                    <div className="flex items-center gap-2 text-green-300 text-sm mb-1">
+                      <CheckCircle size={16} />
+                      <strong>AI Backend Ready</strong>
+                    </div>
+                    <div className="text-green-200 text-xs">
+                      📊 {backendStats.totalChunks} chunks indexed | 🧠 LLM: Gemini 2.0 Flash | 🔍 Vector Search: Active
+                    </div>
                   </div>
                 )}
                 {(!backendStats || backendStats.totalChunks === 0) && (
-                  <div className="mt-2 p-2 bg-yellow-600/20 border border-yellow-400/20 rounded text-yellow-300 text-sm">
-                    ⚠️ No documents indexed yet. Use Google Drive analysis for best results.
+                  <div className="mt-3 p-3 bg-amber-600/20 border border-amber-400/20 rounded">
+                    <div className="flex items-center gap-2 text-amber-300 text-sm mb-1">
+                      <Database size={16} />
+                      <strong>No Documents Indexed</strong>
+                    </div>
+                    <div className="text-amber-200 text-xs">
+                      🚀 Upload files or use Google Drive analysis to enable AI search
+                    </div>
                   </div>
                 )}
               </div>
