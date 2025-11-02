@@ -1474,8 +1474,23 @@ This is a test document to verify AI Search functionality works correctly.`;
                       const blob = new Blob([testContent], { type: 'text/plain' });
                       const file = new File([blob], 'DIRECT-TEST-AI-SEARCH.txt', { type: 'text/plain' });
                       
-                      toast.info('📤 Uploading test file to AI backend...');
-                      const uploadResult = await apiService.uploadFiles([file], 'DIRECT TEST', 'AI Search Ready');
+                      // Upload directly to backend using fetch (bypassing API service)
+                      toast.info('📤 Uploading directly to backend...');
+                      const formData = new FormData();
+                      formData.append('files', file);
+                      formData.append('system', 'DIRECT TEST');
+                      formData.append('subsystem', 'AI Search Ready');
+                      
+                      const response = await fetch(`${config.API_BASE_URL}/ingest`, {
+                        method: 'POST',
+                        body: formData
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error(`Backend upload failed: ${response.status}`);
+                      }
+                      
+                      const uploadResult = await response.json();
                       
                       if (uploadResult.added > 0) {
                         toast.success(`✅ SUCCESS! Test file uploaded to AI backend`);
