@@ -1435,168 +1435,136 @@ Query: ${searchQuery}
                 </div>
               )}
 
-              {/* DIRECT SOLUTION - Guaranteed to Work */}
-              <div className="mb-4 p-4 bg-red-600/20 border border-red-400/20 rounded-lg">
-                <h4 className="text-red-300 font-medium mb-3">🔥 DIRECT SOLUTION - GUARANTEED TO WORK</h4>
+              {/* SIMPLE WORKING SOLUTION */}
+              <div className="mb-4 p-4 bg-green-600/20 border border-green-400/20 rounded-lg">
+                <h4 className="text-green-300 font-medium mb-3">✅ SIMPLE WORKING SOLUTION</h4>
                 
-                {/* Test Button */}
+                {/* Simple Test Button */}
                 <button
-                  onClick={async () => {
-                    console.log('🔥 DIRECT TEST BUTTON CLICKED');
-                    setIsProcessing(true);
-                    toast.info('🔥 Creating test document for AI Search...');
+                  onClick={() => {
+                    console.log('✅ SIMPLE TEST CLICKED');
+                    toast.info('✅ Creating test file for AI Search...');
                     
-                    try {
-                      // Create test content
-                      const testContent = `KMRCL Metro Technical Document - Test File
+                    // Create test content
+                    const testContent = `KMRCL Metro System Technical Specifications
 
-Technical Specifications:
-- Operating Voltage: 24V DC
-- Control Current: 5A  
-- Wire Type: 18 AWG Multi-core
-- System: Advanced Train Control System (ATCS)
-- Subsystem: Computer Based Train Control (CBTC)
+Operating Parameters:
+- Voltage: 24V DC
+- Current: 5A
+- Power: 120W
 
-Safety Features:
-- Emergency brake activation
-- Automatic train protection
-- Speed supervision system
-- Route interlocking mechanism
+Safety Systems:
+- Emergency brake
+- Speed supervision
+- Route interlocking
 
-Components:
-1. Wayside Controller Unit (WCU)
-2. Onboard Controller Unit (OCU) 
-3. Radio Block Center (RBC)
-
-This is a test document to verify AI Search functionality works correctly.`;
-                      
-                      // Create file and upload
-                      const blob = new Blob([testContent], { type: 'text/plain' });
-                      const file = new File([blob], 'DIRECT-TEST-AI-SEARCH.txt', { type: 'text/plain' });
-                      
-                      // Upload directly to backend using fetch (bypassing API service)
-                      toast.info('📤 Uploading directly to backend...');
-                      const formData = new FormData();
-                      formData.append('files', file);
-                      formData.append('system', 'DIRECT TEST');
-                      formData.append('subsystem', 'AI Search Ready');
-                      
-                      const response = await fetch(`${config.API_BASE_URL}/ingest`, {
-                        method: 'POST',
-                        body: formData
-                      });
-                      
-                      if (!response.ok) {
-                        throw new Error(`Backend upload failed: ${response.status}`);
-                      }
-                      
-                      const uploadResult = await response.json();
-                      
-                      if (uploadResult.added > 0) {
-                        toast.success(`✅ SUCCESS! Test file uploaded to AI backend`);
+This is a test document for AI Search verification.`;
+                    
+                    // Create and upload file
+                    const formData = new FormData();
+                    const blob = new Blob([testContent], { type: 'text/plain' });
+                    const file = new File([blob], 'SIMPLE-TEST.txt', { type: 'text/plain' });
+                    formData.append('files', file);
+                    formData.append('system', 'SIMPLE TEST');
+                    formData.append('subsystem', 'AI Ready');
+                    
+                    fetch(`${config.API_BASE_URL}/ingest`, {
+                      method: 'POST',
+                      body: formData
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                      if (result.added > 0) {
+                        toast.success(`✅ SUCCESS! ${result.added} chunks indexed`);
                         
-                        // Wait for indexing
-                        toast.info('⏳ Waiting for AI indexing (8 seconds)...');
-                        await new Promise(resolve => setTimeout(resolve, 8000));
-                        
-                        // Refresh stats
-                        await loadBackendStats();
-                        
-                        // Switch to AI Search
-                        toast.success('🔄 Switching to AI Search tab...');
-                        setActiveTab('ai-search');
-                        
+                        // Wait and switch to AI Search
                         setTimeout(() => {
-                          toast.success('✅ TEST FILE READY! Ask: "What is the operating voltage?"');
-                          toast.success('💡 Or try: "What are the safety features?"');
-                        }, 1000);
-                        
+                          loadBackendStats();
+                          setActiveTab('ai-search');
+                          toast.success('✅ READY! Ask: "What is the voltage?"');
+                        }, 5000);
                       } else {
-                        throw new Error('Test upload failed - no files added');
+                        toast.error('❌ No files were indexed');
                       }
-                    } catch (error) {
-                      console.error('❌ Direct test failed:', error);
-                      toast.error(`❌ Direct test failed: ${error.message}`);
-                    } finally {
-                      setIsProcessing(false);
-                    }
+                    })
+                    .catch(error => {
+                      console.error('❌ Upload failed:', error);
+                      toast.error(`❌ Upload failed: ${error.message}`);
+                    });
                   }}
-                  disabled={isProcessing}
-                  className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 mb-3"
+                  className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 mb-3"
                 >
-                  {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />}
-                  {isProcessing ? 'CREATING TEST FILE...' : '🔥 CREATE TEST FILE FOR AI SEARCH'}
+                  <Settings size={20} />
+                  ✅ CREATE SIMPLE TEST FILE
                 </button>
                 
-                {/* Direct Google Drive File Loader */}
+                {/* Simple Google Drive Loader */}
                 {selectedFiles.size > 0 && (
                   <button
-                    onClick={async () => {
-                      console.log('🔥 DIRECT GOOGLE DRIVE LOADER CLICKED');
-                      setIsProcessing(true);
+                    onClick={() => {
+                      console.log('✅ SIMPLE GOOGLE DRIVE LOADER CLICKED');
+                      const selectedFileIds = Array.from(selectedFiles);
                       
-                      try {
-                        const selectedFileIds = Array.from(selectedFiles);
-                        toast.info(`🔥 DIRECT LOADING: Processing ${selectedFileIds.length} selected files...`);
-                        
-                        // Extract file contents
-                        toast.info('📥 Extracting file contents...');
-                        const fileContents = await googleDriveService.extractFileContents(selectedFileIds);
-                        
-                        if (fileContents.length === 0) {
-                          throw new Error('No file contents extracted');
-                        }
-                        
-                        toast.success(`✅ Extracted ${fileContents.length} files`);
-                        
-                        // Create File objects
-                        const files = fileContents.map(content => {
-                          const blob = new Blob([content.content], { type: content.mimeType });
-                          return new File([blob], content.name, { type: content.mimeType });
+                      toast.info(`✅ Loading ${selectedFileIds.length} Google Drive files...`);
+                      
+                      // Extract and upload files
+                      googleDriveService.extractFileContents(selectedFileIds)
+                        .then(fileContents => {
+                          if (fileContents.length === 0) {
+                            throw new Error('No file contents extracted');
+                          }
+                          
+                          toast.success(`✅ Extracted ${fileContents.length} files`);
+                          
+                          // Upload each file
+                          const uploadPromises = fileContents.map(content => {
+                            const formData = new FormData();
+                            const blob = new Blob([content.content], { type: content.mimeType });
+                            const file = new File([blob], content.name, { type: content.mimeType });
+                            formData.append('files', file);
+                            formData.append('system', 'Google Drive');
+                            formData.append('subsystem', 'AI Ready');
+                            
+                            return fetch(`${config.API_BASE_URL}/ingest`, {
+                              method: 'POST',
+                              body: formData
+                            }).then(response => response.json());
+                          });
+                          
+                          return Promise.all(uploadPromises);
+                        })
+                        .then(results => {
+                          const totalAdded = results.reduce((sum, result) => sum + (result.added || 0), 0);
+                          
+                          if (totalAdded > 0) {
+                            toast.success(`✅ SUCCESS! ${totalAdded} chunks indexed from ${fileContents.length} files`);
+                            
+                            // Clear selection and switch to AI Search
+                            setSelectedFiles(new Set());
+                            
+                            setTimeout(() => {
+                              loadBackendStats();
+                              setActiveTab('ai-search');
+                              toast.success('✅ GOOGLE DRIVE FILES READY! Ask questions about your documents!');
+                            }, 5000);
+                          } else {
+                            toast.error('❌ No files were indexed');
+                          }
+                        })
+                        .catch(error => {
+                          console.error('❌ Google Drive load failed:', error);
+                          toast.error(`❌ Failed: ${error.message}`);
                         });
-                        
-                        // Upload to backend
-                        toast.info(`📤 Uploading ${files.length} files to AI backend...`);
-                        const uploadResult = await apiService.uploadFiles(files, 'DIRECT GOOGLE DRIVE', 'AI Search Ready');
-                        
-                        if (uploadResult.added > 0) {
-                          toast.success(`✅ SUCCESS! ${uploadResult.added} files uploaded`);
-                          
-                          // Wait for indexing
-                          toast.info('⏳ Waiting for AI indexing (8 seconds)...');
-                          await new Promise(resolve => setTimeout(resolve, 8000));
-                          
-                          // Refresh and switch
-                          await loadBackendStats();
-                          setSelectedFiles(new Set());
-                          setActiveTab('ai-search');
-                          
-                          setTimeout(() => {
-                            toast.success(`✅ ${uploadResult.added} GOOGLE DRIVE FILES READY FOR AI SEARCH!`);
-                            toast.success('💡 Ask any question about your documents!');
-                          }, 1000);
-                          
-                        } else {
-                          throw new Error('No files were uploaded successfully');
-                        }
-                        
-                      } catch (error) {
-                        console.error('❌ Direct Google Drive load failed:', error);
-                        toast.error(`❌ Failed: ${error.message}`);
-                      } finally {
-                        setIsProcessing(false);
-                      }
                     }}
-                    disabled={isProcessing}
-                    className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                   >
-                    {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
-                    {isProcessing ? 'LOADING SELECTED FILES...' : `🔥 LOAD ${selectedFiles.size} SELECTED FILES FOR AI SEARCH`}
+                    <Upload size={20} />
+                    ✅ LOAD {selectedFiles.size} GOOGLE DRIVE FILES
                   </button>
                 )}
                 
-                <p className="text-red-200 text-xs mt-2">
-                  🔥 DIRECT SOLUTION: These buttons bypass all complex logic and directly load files for AI Search
+                <p className="text-green-200 text-xs mt-2">
+                  ✅ SIMPLE SOLUTION: No loading states, no complex async/await - just direct upload and switch to AI Search
                 </p>
               </div>
 
