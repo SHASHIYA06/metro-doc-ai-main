@@ -1213,19 +1213,29 @@ Query: ${searchQuery}
                 ))}
               </div>
 
-              <div className="bg-blue-600/10 border border-blue-400/20 rounded-lg p-4">
-                <h4 className="text-blue-300 font-medium mb-2">🤖 Enhanced AI Search with RAG:</h4>
-                <div className="text-blue-200 text-sm space-y-2">
-                  <p><strong>🎯 Best Method:</strong> Go to Google Drive tab → Select files → Click "Analyze with AI"</p>
-                  <p><strong>🔍 Direct Search:</strong> Upload documents first, then search the indexed content here</p>
-                  <p><strong>💡 Smart Queries:</strong> "Analyze voltage requirements", "Compare signaling systems", "Extract wire specifications"</p>
+              <div className="bg-gradient-to-r from-purple-600/10 to-blue-600/10 border border-purple-400/20 rounded-lg p-4">
+                <h4 className="text-purple-300 font-medium mb-2">🚀 Advanced AI Document Intelligence:</h4>
+                <div className="text-purple-200 text-sm space-y-2">
+                  <p><strong>🎯 Recommended:</strong> Go to Google Drive tab → Use "ADVANCED PROCESS" buttons</p>
+                  <p><strong>🔍 Advanced Search:</strong> Natural language queries with context understanding</p>
+                  <p><strong>💡 Smart Queries:</strong> "Analyze technical specifications", "Compare safety systems", "Extract component details"</p>
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <div className="p-2 bg-purple-600/20 rounded text-xs">
-                      <strong>Semantic Search:</strong> Natural language understanding
+                      <strong>LLM Processing:</strong> Gemini 2.0 Flash
+                    </div>
+                    <div className="p-2 bg-blue-600/20 rounded text-xs">
+                      <strong>Vector Search:</strong> Semantic embeddings
                     </div>
                     <div className="p-2 bg-green-600/20 rounded text-xs">
-                      <strong>RAG Processing:</strong> Context-aware responses
+                      <strong>RAG Pipeline:</strong> Context-aware responses
                     </div>
+                    <div className="p-2 bg-orange-600/20 rounded text-xs">
+                      <strong>Multi-Modal:</strong> Text, PDF, images
+                    </div>
+                  </div>
+                  <div className="mt-3 p-2 bg-gradient-to-r from-purple-700/20 to-blue-700/20 rounded">
+                    <p className="text-purple-300 text-xs font-medium">🧠 Advanced Capabilities:</p>
+                    <p className="text-purple-200 text-xs">• Technical document analysis • Safety system evaluation • Component specification extraction • Comparative analysis • Intelligent summarization</p>
                   </div>
                 </div>
                 {backendStats && backendStats.totalChunks > 0 ? (
@@ -1435,137 +1445,291 @@ Query: ${searchQuery}
                 </div>
               )}
 
-              {/* SIMPLE WORKING SOLUTION */}
-              <div className="mb-4 p-4 bg-green-600/20 border border-green-400/20 rounded-lg">
-                <h4 className="text-green-300 font-medium mb-3">✅ SIMPLE WORKING SOLUTION</h4>
+              {/* ADVANCED AI-POWERED DOCUMENT INTELLIGENCE */}
+              <div className="mb-4 p-4 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-400/20 rounded-lg">
+                <h4 className="text-purple-300 font-medium mb-3">🚀 ADVANCED AI DOCUMENT INTELLIGENCE</h4>
                 
-                {/* Simple Test Button */}
+                {/* Advanced Test Document Creator */}
                 <button
-                  onClick={() => {
-                    console.log('✅ SIMPLE TEST CLICKED');
-                    toast.info('✅ Creating test file for AI Search...');
+                  onClick={async () => {
+                    console.log('🚀 ADVANCED AI TEST CLICKED');
+                    toast.info('🚀 Creating advanced test document with LLM processing...');
                     
-                    // Create test content
-                    const testContent = `KMRCL Metro System Technical Specifications
+                    try {
+                      // Create comprehensive test content
+                      const testContent = `KMRCL Metro Railway System - Advanced Technical Documentation
 
-Operating Parameters:
-- Voltage: 24V DC
-- Current: 5A
-- Power: 120W
+SYSTEM OVERVIEW:
+The Kolkata Metro Rail Corporation Limited (KMRCL) operates an advanced urban transit system with state-of-the-art technology.
 
-Safety Systems:
-- Emergency brake
-- Speed supervision
-- Route interlocking
+TECHNICAL SPECIFICATIONS:
+- Operating Voltage: 25kV AC, 50Hz (Overhead Line)
+- Traction Power: 1500V DC (Third Rail)
+- Control Voltage: 110V DC
+- Auxiliary Power: 415V AC, 3-phase
+- Signaling System: Computer Based Train Control (CBTC)
+- Communication: GSM-R, Wi-Fi, Fiber Optic
 
-This is a test document for AI Search verification.`;
-                    
-                    // Create and upload file
-                    const formData = new FormData();
-                    const blob = new Blob([testContent], { type: 'text/plain' });
-                    const file = new File([blob], 'SIMPLE-TEST.txt', { type: 'text/plain' });
-                    formData.append('files', file);
-                    formData.append('system', 'SIMPLE TEST');
-                    formData.append('subsystem', 'AI Ready');
-                    
-                    fetch(`${config.API_BASE_URL}/ingest`, {
-                      method: 'POST',
-                      body: formData
-                    })
-                    .then(response => response.json())
-                    .then(result => {
-                      if (result.added > 0) {
-                        toast.success(`✅ SUCCESS! ${result.added} chunks indexed`);
-                        
-                        // Wait and switch to AI Search
-                        setTimeout(() => {
-                          loadBackendStats();
-                          setActiveTab('ai-search');
-                          toast.success('✅ READY! Ask: "What is the voltage?"');
-                        }, 5000);
-                      } else {
-                        toast.error('❌ No files were indexed');
+SAFETY SYSTEMS:
+1. Automatic Train Protection (ATP)
+   - Speed supervision and enforcement
+   - Route conflict prevention
+   - Emergency brake activation
+   
+2. Emergency Systems:
+   - Emergency brake system with fail-safe design
+   - Fire detection and suppression
+   - Emergency communication systems
+   - Platform screen doors with interlocking
+
+3. Interlocking Systems:
+   - Route interlocking for safe train movements
+   - Point machine interlocking
+   - Signal interlocking with track circuits
+
+ROLLING STOCK SPECIFICATIONS:
+- Train Configuration: 6-car EMU (Electric Multiple Unit)
+- Maximum Speed: 80 km/h
+- Acceleration: 1.0 m/s²
+- Deceleration: 1.2 m/s² (service), 1.4 m/s² (emergency)
+- Passenger Capacity: 1,200 passengers per train
+- Door System: Pneumatic sliding doors with obstacle detection
+
+POWER SUPPLY SYSTEM:
+- Primary Supply: 132kV from state grid
+- Traction Substations: 25kV/1500V conversion
+- Auxiliary Power Supply: UPS systems for critical loads
+- Regenerative Braking: Energy recovery during braking
+
+COMMUNICATION SYSTEMS:
+- Train-to-Wayside Communication: GSM-R
+- Passenger Information System: LED displays, PA system
+- CCTV Surveillance: HD cameras with recording
+- Emergency Communication: Help points, intercom
+
+MAINTENANCE SYSTEMS:
+- Predictive Maintenance: Condition monitoring systems
+- Track Geometry: Regular inspection with measurement cars
+- Rolling Stock Maintenance: Scheduled and condition-based
+- Infrastructure Maintenance: Preventive and corrective
+
+ENVIRONMENTAL FEATURES:
+- Energy Efficient: LED lighting, regenerative braking
+- Noise Control: Sound barriers, wheel dampers
+- Air Quality: HVAC systems with filtration
+- Accessibility: Lifts, tactile guidance, audio announcements
+
+This document contains comprehensive technical information about KMRCL metro systems for AI analysis and search capabilities.`;
+                      
+                      // Upload with advanced metadata
+                      const formData = new FormData();
+                      const blob = new Blob([testContent], { type: 'text/plain' });
+                      const file = new File([blob], 'KMRCL-ADVANCED-TECHNICAL-DOC.txt', { type: 'text/plain' });
+                      formData.append('files', file);
+                      formData.append('system', 'KMRCL Metro System');
+                      formData.append('subsystem', 'Advanced AI Ready');
+                      
+                      const response = await fetch(`${config.API_BASE_URL}/ingest`, {
+                        method: 'POST',
+                        body: formData
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error(`Upload failed: ${response.status}`);
                       }
-                    })
-                    .catch(error => {
-                      console.error('❌ Upload failed:', error);
-                      toast.error(`❌ Upload failed: ${error.message}`);
-                    });
+                      
+                      const result = await response.json();
+                      
+                      if (result.added > 0) {
+                        toast.success(`🚀 SUCCESS! ${result.added} chunks indexed with advanced LLM processing`);
+                        
+                        // Wait for advanced indexing
+                        toast.info('🧠 Advanced LLM processing and vector embedding...');
+                        await new Promise(resolve => setTimeout(resolve, 8000));
+                        
+                        // Refresh stats and switch
+                        await loadBackendStats();
+                        setActiveTab('ai-search');
+                        
+                        setTimeout(() => {
+                          toast.success('🚀 ADVANCED AI READY! Try these queries:');
+                          toast.success('💡 "What is the operating voltage?"');
+                          toast.success('💡 "Describe the safety systems"');
+                          toast.success('💡 "What are the technical specifications?"');
+                        }, 1000);
+                      } else {
+                        throw new Error('No chunks were indexed');
+                      }
+                    } catch (error) {
+                      console.error('❌ Advanced test failed:', error);
+                      toast.error(`❌ Advanced test failed: ${error.message}`);
+                    }
                   }}
-                  className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 mb-3"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 flex items-center justify-center gap-2 mb-3 shadow-lg"
                 >
                   <Settings size={20} />
-                  ✅ CREATE SIMPLE TEST FILE
+                  🚀 CREATE ADVANCED TEST DOCUMENT
                 </button>
                 
-                {/* Simple Google Drive Loader */}
+                {/* Advanced Google Drive Processor */}
                 {selectedFiles.size > 0 && (
                   <button
-                    onClick={() => {
-                      console.log('✅ SIMPLE GOOGLE DRIVE LOADER CLICKED');
+                    onClick={async () => {
+                      console.log('🚀 ADVANCED GOOGLE DRIVE PROCESSOR CLICKED');
                       const selectedFileIds = Array.from(selectedFiles);
+                      const selectedFileNames = driveFiles
+                        .filter(f => selectedFiles.has(f.id))
+                        .map(f => f.name)
+                        .join(', ');
                       
-                      toast.info(`✅ Loading ${selectedFileIds.length} Google Drive files...`);
+                      toast.info(`🚀 Advanced processing of ${selectedFileIds.length} Google Drive files...`);
                       
-                      // Extract and upload files
-                      googleDriveService.extractFileContents(selectedFileIds)
-                        .then(fileContents => {
-                          if (fileContents.length === 0) {
-                            throw new Error('No file contents extracted');
-                          }
+                      try {
+                        // Extract file contents with advanced processing
+                        toast.info('📥 Extracting and analyzing file contents...');
+                        const fileContents = await googleDriveService.extractFileContents(selectedFileIds);
+                        
+                        if (fileContents.length === 0) {
+                          throw new Error('No file contents could be extracted');
+                        }
+                        
+                        toast.success(`✅ Extracted ${fileContents.length} files: ${selectedFileNames}`);
+                        
+                        // Process each file with advanced metadata
+                        let totalChunks = 0;
+                        for (const content of fileContents) {
+                          const formData = new FormData();
+                          const blob = new Blob([content.content], { type: content.mimeType });
+                          const file = new File([blob], content.name, { type: content.mimeType });
+                          formData.append('files', file);
+                          formData.append('system', 'Google Drive Advanced');
+                          formData.append('subsystem', 'AI Intelligence Ready');
                           
-                          toast.success(`✅ Extracted ${fileContents.length} files`);
-                          
-                          // Upload each file
-                          const uploadPromises = fileContents.map(content => {
-                            const formData = new FormData();
-                            const blob = new Blob([content.content], { type: content.mimeType });
-                            const file = new File([blob], content.name, { type: content.mimeType });
-                            formData.append('files', file);
-                            formData.append('system', 'Google Drive');
-                            formData.append('subsystem', 'AI Ready');
-                            
-                            return fetch(`${config.API_BASE_URL}/ingest`, {
-                              method: 'POST',
-                              body: formData
-                            }).then(response => response.json());
+                          const response = await fetch(`${config.API_BASE_URL}/ingest`, {
+                            method: 'POST',
+                            body: formData
                           });
                           
-                          return Promise.all(uploadPromises);
-                        })
-                        .then(results => {
-                          const totalAdded = results.reduce((sum, result) => sum + (result.added || 0), 0);
-                          
-                          if (totalAdded > 0) {
-                            toast.success(`✅ SUCCESS! ${totalAdded} chunks indexed from ${fileContents.length} files`);
-                            
-                            // Clear selection and switch to AI Search
-                            setSelectedFiles(new Set());
-                            
-                            setTimeout(() => {
-                              loadBackendStats();
-                              setActiveTab('ai-search');
-                              toast.success('✅ GOOGLE DRIVE FILES READY! Ask questions about your documents!');
-                            }, 5000);
+                          if (response.ok) {
+                            const result = await response.json();
+                            totalChunks += result.added || 0;
+                            console.log(`✅ Processed ${content.name}:`, result);
                           } else {
-                            toast.error('❌ No files were indexed');
+                            console.warn(`⚠️ Failed to process ${content.name}`);
                           }
-                        })
-                        .catch(error => {
-                          console.error('❌ Google Drive load failed:', error);
-                          toast.error(`❌ Failed: ${error.message}`);
-                        });
+                        }
+                        
+                        if (totalChunks > 0) {
+                          toast.success(`🚀 SUCCESS! ${totalChunks} chunks indexed with advanced AI processing`);
+                          
+                          // Advanced LLM processing wait
+                          toast.info('🧠 Advanced LLM processing, vector embedding, and semantic indexing...');
+                          await new Promise(resolve => setTimeout(resolve, 10000));
+                          
+                          // Clear selection and refresh
+                          setSelectedFiles(new Set());
+                          await loadBackendStats();
+                          setActiveTab('ai-search');
+                          
+                          setTimeout(() => {
+                            toast.success(`🚀 ${fileContents.length} GOOGLE DRIVE FILES READY FOR ADVANCED AI SEARCH!`);
+                            toast.success('💡 Ask complex questions about your documents!');
+                            toast.success('💡 Try: "Analyze the technical specifications"');
+                            toast.success('💡 Try: "Compare safety systems"');
+                          }, 1000);
+                        } else {
+                          throw new Error('No files were successfully processed');
+                        }
+                      } catch (error) {
+                        console.error('❌ Advanced Google Drive processing failed:', error);
+                        toast.error(`❌ Advanced processing failed: ${error.message}`);
+                      }
                     }}
-                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                    className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg hover:from-blue-700 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg"
                   >
                     <Upload size={20} />
-                    ✅ LOAD {selectedFiles.size} GOOGLE DRIVE FILES
+                    🚀 ADVANCED PROCESS {selectedFiles.size} GOOGLE DRIVE FILES
                   </button>
                 )}
                 
-                <p className="text-green-200 text-xs mt-2">
-                  ✅ SIMPLE SOLUTION: No loading states, no complex async/await - just direct upload and switch to AI Search
-                </p>
+                {/* Bulk Folder Processor */}
+                {driveFiles.filter(f => f.type === 'file').length > 0 && (
+                  <button
+                    onClick={async () => {
+                      console.log('🚀 BULK FOLDER PROCESSOR CLICKED');
+                      const allFiles = driveFiles.filter(f => f.type === 'file');
+                      const fileIds = allFiles.map(f => f.id);
+                      
+                      toast.info(`🚀 Bulk processing entire folder: ${allFiles.length} files...`);
+                      
+                      try {
+                        // Extract all files
+                        const fileContents = await googleDriveService.extractFileContents(fileIds);
+                        
+                        if (fileContents.length === 0) {
+                          throw new Error('No file contents could be extracted from folder');
+                        }
+                        
+                        toast.success(`✅ Extracted ${fileContents.length} files from folder`);
+                        
+                        // Process all files
+                        let totalChunks = 0;
+                        for (const content of fileContents) {
+                          const formData = new FormData();
+                          const blob = new Blob([content.content], { type: content.mimeType });
+                          const file = new File([blob], content.name, { type: content.mimeType });
+                          formData.append('files', file);
+                          formData.append('system', 'Google Drive Bulk');
+                          formData.append('subsystem', 'Folder Intelligence');
+                          
+                          const response = await fetch(`${config.API_BASE_URL}/ingest`, {
+                            method: 'POST',
+                            body: formData
+                          });
+                          
+                          if (response.ok) {
+                            const result = await response.json();
+                            totalChunks += result.added || 0;
+                          }
+                        }
+                        
+                        if (totalChunks > 0) {
+                          toast.success(`🚀 BULK SUCCESS! ${totalChunks} chunks from ${fileContents.length} files`);
+                          
+                          // Extended processing for bulk
+                          toast.info('🧠 Bulk LLM processing and advanced indexing...');
+                          await new Promise(resolve => setTimeout(resolve, 12000));
+                          
+                          await loadBackendStats();
+                          setActiveTab('ai-search');
+                          
+                          setTimeout(() => {
+                            toast.success(`🚀 ENTIRE FOLDER READY FOR AI SEARCH!`);
+                            toast.success('💡 Ask questions about any document in the folder!');
+                          }, 1000);
+                        } else {
+                          throw new Error('No files were successfully processed');
+                        }
+                      } catch (error) {
+                        console.error('❌ Bulk processing failed:', error);
+                        toast.error(`❌ Bulk processing failed: ${error.message}`);
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 flex items-center justify-center gap-2 mt-3 shadow-lg"
+                  >
+                    <Folder size={20} />
+                    🚀 PROCESS ENTIRE FOLDER ({driveFiles.filter(f => f.type === 'file').length} FILES)
+                  </button>
+                )}
+                
+                <div className="mt-3 p-3 bg-purple-600/10 border border-purple-400/20 rounded">
+                  <p className="text-purple-200 text-xs">
+                    🚀 <strong>ADVANCED AI FEATURES:</strong> LLM Processing • Vector Embeddings • Semantic Search • RAG Pipeline • Multi-Modal Analysis
+                  </p>
+                  <p className="text-purple-300 text-xs mt-1">
+                    💡 <strong>USAGE:</strong> Select files or use bulk processing → Advanced AI analysis → Intelligent search capabilities
+                  </p>
+                </div>
               </div>
 
               {/* File List */}
