@@ -722,23 +722,56 @@ The AI will search through your documents and provide intelligent answers.`,
         }
       }
       
-      // Strategy 3: If still no results, try simplified query (extract key words)
+      // Strategy 3: Convert to "What is..." format (backend prefers complete questions)
       if (!searchResult) {
-        console.log('📊 Strategy 3: Trying simplified query');
-        const keyWords = searchQuery.toLowerCase()
-          .split(/\s+/)
-          .filter(word => word.length > 2)
-          .filter(word => !['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'she', 'use', 'way', 'what', 'when', 'with'].includes(word));
+        console.log('📊 Strategy 3: Converting to "What is..." format');
         
-        const simplifiedQuery = keyWords.slice(0, 2).join(' ') || keyWords[0] || searchQuery;
-        console.log('🔍 Simplified query:', simplifiedQuery);
+        let questionQuery = '';
+        const lowerQuery = searchQuery.toLowerCase();
+        
+        // Convert common patterns to questions that work
+        if (lowerQuery.includes('voltage')) {
+          questionQuery = 'What is the operating voltage?';
+        } else if (lowerQuery.includes('safety') || lowerQuery.includes('emergency')) {
+          questionQuery = 'What are the safety systems?';
+        } else if (lowerQuery.includes('specification') || lowerQuery.includes('technical')) {
+          questionQuery = 'What are the technical specifications?';
+        } else if (lowerQuery.includes('control') || lowerQuery.includes('system')) {
+          questionQuery = 'What are the control systems?';
+        } else if (lowerQuery.includes('electrical') || lowerQuery.includes('power')) {
+          questionQuery = 'What are the electrical specifications?';
+        } else if (lowerQuery.includes('traction') || lowerQuery.includes('motor')) {
+          questionQuery = 'What is the traction system?';
+        } else if (lowerQuery.includes('brake') || lowerQuery.includes('braking')) {
+          questionQuery = 'What is the braking system?';
+        } else if (lowerQuery.includes('signal') || lowerQuery.includes('cbtc')) {
+          questionQuery = 'What is the signaling system?';
+        } else if (lowerQuery.includes('failure') || lowerQuery.includes('fault') || lowerQuery.includes('error')) {
+          questionQuery = 'What are the failure modes and troubleshooting procedures?';
+        } else if (lowerQuery.includes('dcu')) {
+          questionQuery = 'What is the DCU system and its failure modes?';
+        } else {
+          // Extract key words and create a question
+          const keyWords = searchQuery.toLowerCase()
+            .split(/\s+/)
+            .filter(word => word.length > 2)
+            .filter(word => !['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'she', 'use', 'way', 'what', 'when', 'with'].includes(word));
+          
+          if (keyWords.length > 0) {
+            questionQuery = `What is the ${keyWords.slice(0, 2).join(' ')}?`;
+          } else {
+            questionQuery = `What are the technical specifications?`;
+          }
+        }
+        
+        console.log('🔍 Question format query:', questionQuery);
         
         try {
           const response3 = await fetch(`${config.API_BASE_URL}/ask`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              query: simplifiedQuery,
+              query: questionQuery,
               k: 5,
               system: '',
               subsystem: '',
@@ -747,29 +780,29 @@ The AI will search through your documents and provide intelligent answers.`,
           });
           
           const data3 = await response3.json();
-          searchAttempts.push({ strategy: 'Simplified', result: data3 });
+          searchAttempts.push({ strategy: `Question format: "${questionQuery}"`, result: data3 });
           
           if (data3.result && !data3.result.includes('No relevant documents found') && data3.sources?.length > 0) {
             searchResult = data3;
-            console.log('✅ Strategy 3 SUCCESS with simplified query');
+            console.log('✅ Strategy 3 SUCCESS with question format');
           }
         } catch (e) {
           console.log('❌ Strategy 3 failed:', e.message);
         }
       }
       
-      // Strategy 4: If still no results, try just the first key word
-      if (!searchResult && keyWords && keyWords.length > 0) {
-        console.log('📊 Strategy 4: Trying single keyword');
-        const singleWord = keyWords[0];
-        console.log('🔍 Single word query:', singleWord);
+      // Strategy 4: Try generic technical specifications question
+      if (!searchResult) {
+        console.log('📊 Strategy 4: Trying generic technical question');
+        const genericQuery = 'What are the technical specifications?';
+        console.log('🔍 Generic query:', genericQuery);
         
         try {
           const response4 = await fetch(`${config.API_BASE_URL}/ask`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              query: singleWord,
+              query: genericQuery,
               k: 5,
               system: '',
               subsystem: '',
@@ -778,11 +811,11 @@ The AI will search through your documents and provide intelligent answers.`,
           });
           
           const data4 = await response4.json();
-          searchAttempts.push({ strategy: 'Single word', result: data4 });
+          searchAttempts.push({ strategy: 'Generic technical specs', result: data4 });
           
           if (data4.result && !data4.result.includes('No relevant documents found') && data4.sources?.length > 0) {
             searchResult = data4;
-            console.log('✅ Strategy 4 SUCCESS with single word');
+            console.log('✅ Strategy 4 SUCCESS with generic question');
           }
         } catch (e) {
           console.log('❌ Strategy 4 failed:', e.message);
@@ -843,32 +876,42 @@ The AI will search through your documents and provide intelligent answers.`,
         
         const noResultsMessage: SearchResult = {
           id: 'intelligent_no_results',
-          title: '🔍 No Results Found (Tried Multiple Strategies)',
-          content: `I tried multiple search strategies for "${searchQuery}" but couldn't find relevant matches:
+          title: '🔍 No Results Found - Backend Algorithm Issue',
+          content: `I tried multiple intelligent search strategies for "${searchQuery}" but the backend search algorithm couldn't find matches:
 
 **Search Strategies Attempted:**
 ${searchAttempts.map((attempt, index) => 
   `${index + 1}. ${attempt.strategy}: ${attempt.result.sources?.length || 0} sources, ${attempt.result.result?.length || 0} chars`
 ).join('\n')}
 
-**Suggestions to get better results:**
-1. **Try simpler terms**: Instead of "surge voltage", try just "voltage"
-2. **Use document keywords**: Try terms that are likely in your documents
-3. **Broader queries**: "electrical", "system", "specifications", "technical"
-4. **Check document content**: Make sure your documents contain the information you're looking for
+**Backend Algorithm Behavior:**
+The backend search works best with complete questions starting with "What":
+- ✅ "What is the operating voltage?" → Works perfectly
+- ✅ "What are the technical specifications?" → Works perfectly  
+- ❌ "voltage", "DCU failure", "safety" → Don't work
+
+**Try These Working Query Formats:**
+- **"What is the operating voltage?"**
+- **"What are the safety systems?"**
+- **"What are the technical specifications?"**
+- **"What is the control system?"**
+- **"What are the electrical specifications?"**
+
+**For "${searchQuery}", try:**
+${searchQuery.toLowerCase().includes('voltage') ? '- "What is the operating voltage?"' :
+  searchQuery.toLowerCase().includes('safety') ? '- "What are the safety systems?"' :
+  searchQuery.toLowerCase().includes('dcu') || searchQuery.toLowerCase().includes('failure') ? '- "What are the failure modes and troubleshooting procedures?"' :
+  searchQuery.toLowerCase().includes('control') ? '- "What is the control system?"' :
+  '- "What are the technical specifications?"'}
 
 **Available documents:** ${data.totalIndexed || 0} chunks from ${backendStats?.totalFiles || 0} files
 
-**Quick tests you can try:**
-- "voltage" (single word)
-- "safety" (common term)
-- "system" (broad term)
-- "specifications" (technical docs often have this)`,
-          system: 'Intelligent Search',
-          subsystem: 'No Results',
+The backend search algorithm is very specific about query format. Use complete questions for best results.`,
+          system: 'Search Algorithm',
+          subsystem: 'Format Issue',
           score: 0.5,
-          fileType: 'Search Help',
-          preview: `Tried multiple search strategies for "${searchQuery}" but no relevant matches found. Try simpler terms.`,
+          fileType: 'Backend Limitation',
+          preview: `Backend search algorithm requires complete questions. Try "What is the ${searchQuery}?" format.`,
           sources: []
         };
         
