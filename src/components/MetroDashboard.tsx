@@ -714,7 +714,8 @@ Your query "${searchQuery}" will work great once you have documents loaded!`,
 
       // Proceed with ADVANCED AI search using all features
       console.log('🚀 Using advanced AI search with all features...');
-      toast.info(`🧠 Processing with advanced AI (${searchType} mode)...`);
+      console.log('📊 Backend stats:', backendStats);
+      toast(`🧠 Processing with advanced AI (${searchType} mode)...`);
       
       // Extract search tags for better results
       const searchTags = [];
@@ -733,6 +734,13 @@ Your query "${searchQuery}" will work great once you have documents loaded!`,
       });
       
       console.log('✅ Advanced AI search completed:', response);
+      console.log('📊 Response structure:', {
+        hasResult: !!response.result,
+        resultLength: response.result?.length || 0,
+        sourcesCount: response.sources?.length || 0,
+        used: response.used,
+        totalIndexed: response.totalIndexed
+      });
       
       const convertedResults: SearchResult[] = response.sources.map(source => ({
         id: source.ref.toString(),
@@ -753,33 +761,47 @@ Your query "${searchQuery}" will work great once you have documents loaded!`,
 
       // Add the AI response as the first result if available
       if (response.result && response.result.trim()) {
+        // Strip HTML tags for preview
+        const stripHtml = (html: string) => {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = html;
+          return tmp.textContent || tmp.innerText || '';
+        };
+        
+        const cleanText = stripHtml(response.result);
+        
         const aiResult: SearchResult = {
           id: 'ai_response',
           title: `🤖 AI Analysis - ${searchType.toUpperCase()}`,
-          content: response.result,
+          content: cleanText,
           system: 'AI Response',
           subsystem: searchType,
           score: 1.0,
           fileType: 'AI Analysis',
-          preview: response.result.substring(0, 300) + (response.result.length > 300 ? '...' : ''),
+          preview: cleanText.substring(0, 500) + (cleanText.length > 500 ? '...' : ''),
           sources: [{
             fileName: 'AI Generated Response',
             position: 0,
             score: 1.0,
-            preview: response.result
+            preview: cleanText.substring(0, 300)
           }]
         };
         convertedResults.unshift(aiResult);
       }
 
+      console.log('📋 Converted results:', convertedResults.length, 'results');
+      console.log('🔍 First result:', convertedResults[0]);
+      
       setResults(convertedResults);
       setActiveTab('results');
       
       if (convertedResults.length > 0) {
-        toast.success(`🎉 Found ${convertedResults.length} relevant results using advanced ${searchType} AI search`);
-        toast.success(`🧠 Used: Gemini 2.0 Flash + Vector Search + RAG + Semantic Analysis`);
+        toast.success(`🎉 Found ${convertedResults.length} relevant results!`);
+        if (convertedResults[0].id === 'ai_response') {
+          toast.success(`🤖 AI generated comprehensive analysis`);
+        }
       } else {
-        toast.info('No results found. Try different keywords or check if documents are properly indexed.');
+        toast('No results found. Try different keywords or check if documents are properly indexed.');
       }
       
     } catch (error: any) {
@@ -1935,9 +1957,9 @@ This comprehensive document contains all technical information for AI search tes
                   <p className="text-blue-200">No results yet. Try searching or analyzing files.</p>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto">
+                <div className="space-y-4 max-h-[600px] overflow-y-auto">
                   {results.map((result) => (
-                    <div key={result.id} className="bg-white/5 rounded-lg p-6 border border-white/10">
+                    <div key={result.id} className="bg-white/5 rounded-lg p-6 border border-white/10 hover:bg-white/10 transition-colors">
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="text-lg font-semibold text-white">{result.title}</h3>
                         <div className="flex items-center gap-2">
@@ -1953,12 +1975,35 @@ This comprehensive document contains all technical information for AI search tes
                           </button>
                         </div>
                       </div>
-                      <p className="text-blue-200 mb-3">{result.preview}</p>
+                      
+                      {/* Show full content for AI responses, preview for others */}
+                      {result.id === 'ai_response' ? (
+                        <div className="text-blue-100 mb-3 whitespace-pre-wrap max-h-96 overflow-y-auto bg-black/20 p-4 rounded">
+                          {result.content}
+                        </div>
+                      ) : (
+                        <p className="text-blue-200 mb-3">{result.preview}</p>
+                      )}
+                      
                       <div className="flex gap-4 text-sm text-blue-300">
                         <span>System: {result.system}</span>
                         <span>Subsystem: {result.subsystem}</span>
                         <span>Type: {result.fileType}</span>
                       </div>
+                      
+                      {/* Show sources if available */}
+                      {result.sources && result.sources.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-white/10">
+                          <p className="text-xs text-blue-300 mb-2">📚 Sources ({result.sources.length}):</p>
+                          <div className="space-y-1">
+                            {result.sources.slice(0, 3).map((source, idx) => (
+                              <div key={idx} className="text-xs text-blue-200">
+                                • {source.fileName} (Score: {Math.round(source.score * 100)}%)
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
