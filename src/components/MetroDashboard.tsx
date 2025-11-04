@@ -650,255 +650,152 @@ The AI will search through your documents and provide intelligent answers.`,
     }
   };
 
+  // SIMPLE, BULLETPROOF AI SEARCH FUNCTION
   const handleSearch = async () => {
-    console.log('🔥 SEARCH BUTTON CLICKED!');
-    console.log('Search query:', searchQuery);
-    console.log('Is processing:', isProcessing);
+    console.log('🔥 AI SEARCH STARTED!');
     
     if (!searchQuery.trim()) {
-      console.log('❌ Empty search query');
       toast.error('Please enter a search query');
       return;
     }
 
-    console.log('✅ Search query valid, starting search...');
     setIsProcessing(true);
     
     try {
-      console.log('🔍 Starting enhanced AI search...');
-      console.log('Query:', searchQuery);
-      console.log('Search type:', searchType);
-      console.log('Backend stats:', backendStats);
+      console.log('🔍 Searching for:', searchQuery);
       
-      // Log what systems are actually in the backend
-      if (backendStats?.bySystem) {
-        console.log('📊 Available systems in backend:', Object.keys(backendStats.bySystem));
-        console.log('📊 System details:', backendStats.bySystem);
+      // Direct API call to backend - SIMPLE AND BULLETPROOF
+      const response = await fetch(`${config.API_BASE_URL}/ask`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          k: 10,
+          system: '', // Search ALL systems
+          subsystem: '', // Search ALL subsystems
+          tags: []
+        })
+      });
+      
+      console.log('📡 Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.status}`);
       }
       
-      // Check if we have indexed documents
-      if (!backendStats || backendStats.totalChunks === 0) {
-        console.warn('❌ No documents indexed, showing help message');
-        console.log('Backend stats details:', {
-          exists: !!backendStats,
-          totalChunks: backendStats?.totalChunks,
-          totalFiles: backendStats?.totalFiles
-        });
+      const data = await response.json();
+      console.log('📊 Search response:', data);
+      
+      // Create results array
+      const searchResults: SearchResult[] = [];
+      
+      // Add AI response if available
+      if (data.result && data.result.trim()) {
+        // Clean HTML from result
+        const cleanResult = data.result.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n').trim();
         
-        // Create a helpful result explaining the situation
-        const helpResult: SearchResult = {
-          id: 'help_no_documents',
-          title: '🤖 AI Search Assistant - No Documents Indexed',
-          content: `I'm ready to help you search and analyze documents, but I don't have any documents indexed yet.
-
-Here's how to get started:
-
-**🎯 Recommended Approach:**
-1. Go to the "Google Drive" tab
-2. Select the files you want to analyze
-3. Click "Analyze with AI" for instant results
-
-**📤 Alternative Approach:**
-1. Go to the "Upload" tab
-2. Upload your documents (PDF, Word, Excel, etc.)
-3. Wait for processing to complete
-4. Return here to search the indexed content
-
-**💡 What I can do once you have documents:**
-- Answer technical questions about your files
-- Extract specifications and requirements
-- Find wiring and component details
-- Compare different systems
-- Generate summaries and insights
-
-Your query "${searchQuery}" will work great once you have documents loaded!`,
-          system: 'AI Assistant',
-          subsystem: 'Help',
-          score: 1.0,
-          fileType: 'Guide',
-          preview: 'No documents indexed yet. Here\'s how to get started with AI search...',
-          sources: [{
-            fileName: 'AI Search Guide',
-            position: 0,
-            score: 1.0,
-            preview: 'Step-by-step guide to using AI search effectively'
-          }]
-        };
-
-        setResults([helpResult]);
-        setActiveTab('results');
-        toast.info('💡 No documents indexed yet. Check the results for guidance on how to get started.');
-        return;
-      }
-
-      // Proceed with ADVANCED AI search using all features
-      console.log('🚀 Using advanced AI search with all features...');
-      console.log('📊 Backend stats:', backendStats);
-      console.log('🔧 Search parameters:', {
-        query: searchQuery,
-        searchType: searchType,
-        systemFilter: systemFilter,
-        subsystemFilter: subsystemFilter
-      });
-      toast(`🧠 Processing with advanced AI (${searchType} mode)...`);
-      
-      // Extract search tags for better results
-      const searchTags = [];
-      if (/wire|cable|connect/i.test(searchQuery)) searchTags.push('wiring');
-      if (/safety|emergency/i.test(searchQuery)) searchTags.push('safety');
-      if (/voltage|current|power/i.test(searchQuery)) searchTags.push('electrical');
-      if (/control|system/i.test(searchQuery)) searchTags.push('control');
-      if (/motor|drive/i.test(searchQuery)) searchTags.push('traction');
-      searchTags.push(searchType);
-      
-      // Don't filter by system/subsystem to search ALL documents
-      console.log('🔍 Search parameters being sent:', {
-        query: searchQuery,
-        k: 20,
-        system: '', // Empty to search all systems
-        subsystem: '', // Empty to search all subsystems
-        tags: searchTags
-      });
-      
-      const response = await apiService.search(searchQuery, { 
-        k: 20, // More results for better analysis
-        system: '', // Search ALL systems (don't filter)
-        subsystem: '', // Search ALL subsystems (don't filter)
-        tags: searchTags
-      });
-      
-      console.log('✅ Advanced AI search completed:', response);
-      console.log('📊 Response structure:', {
-        hasResult: !!response.result,
-        resultLength: response.result?.length || 0,
-        sourcesCount: response.sources?.length || 0,
-        used: response.used,
-        totalIndexed: response.totalIndexed
-      });
-      
-      const convertedResults: SearchResult[] = response.sources.map(source => ({
-        id: source.ref.toString(),
-        title: `${source.fileName} - ${source.system}/${source.subsystem}`,
-        content: source.preview,
-        system: source.system,
-        subsystem: source.subsystem,
-        score: source.score,
-        fileType: source.metadata?.mimeType || 'Document',
-        preview: source.preview,
-        sources: [{
-          fileName: source.fileName,
-          position: source.position,
-          score: source.score,
-          preview: source.preview
-        }]
-      }));
-
-      // Add the AI response as the first result if available
-      if (response.result && response.result.trim()) {
-        // Strip HTML tags for preview
-        const stripHtml = (html: string) => {
-          const tmp = document.createElement('div');
-          tmp.innerHTML = html;
-          return tmp.textContent || tmp.innerText || '';
-        };
-        
-        const cleanText = stripHtml(response.result);
-        
-        const aiResult: SearchResult = {
+        searchResults.push({
           id: 'ai_response',
-          title: `🤖 AI Analysis - ${searchType.toUpperCase()}`,
-          content: cleanText,
+          title: '🤖 AI Analysis',
+          content: cleanResult,
           system: 'AI Response',
-          subsystem: searchType,
+          subsystem: 'Generated',
           score: 1.0,
           fileType: 'AI Analysis',
-          preview: cleanText.substring(0, 500) + (cleanText.length > 500 ? '...' : ''),
+          preview: cleanResult.substring(0, 300) + (cleanResult.length > 300 ? '...' : ''),
           sources: [{
             fileName: 'AI Generated Response',
             position: 0,
             score: 1.0,
-            preview: cleanText.substring(0, 300)
+            preview: cleanResult.substring(0, 200)
           }]
-        };
-        convertedResults.unshift(aiResult);
+        });
       }
-
-      console.log('📋 Converted results:', convertedResults.length, 'results');
-      console.log('🔍 First result:', convertedResults[0]);
       
-      setResults(convertedResults);
-      setActiveTab('results');
+      // Add source documents
+      if (data.sources && data.sources.length > 0) {
+        data.sources.forEach((source: any, index: number) => {
+          searchResults.push({
+            id: `source_${index}`,
+            title: `📄 ${source.fileName}`,
+            content: source.preview || 'No preview available',
+            system: source.system || 'Unknown',
+            subsystem: source.subsystem || 'Unknown',
+            score: source.score || 0.5,
+            fileType: 'Document',
+            preview: (source.preview || 'No preview available').substring(0, 300),
+            sources: [{
+              fileName: source.fileName,
+              position: source.position || 0,
+              score: source.score || 0.5,
+              preview: source.preview || 'No preview available'
+            }]
+          });
+        });
+      }
       
-      if (convertedResults.length > 0) {
-        toast.success(`🎉 Found ${convertedResults.length} relevant results!`);
-        if (convertedResults[0].id === 'ai_response') {
-          toast.success(`🤖 AI generated comprehensive analysis`);
-        }
-        console.log('✅ Results found and displayed successfully');
+      console.log('✅ Created', searchResults.length, 'results');
+      
+      if (searchResults.length > 0) {
+        setResults(searchResults);
+        setActiveTab('results');
+        toast.success(`🎉 Found ${searchResults.length} results!`);
+        console.log('✅ Results displayed successfully');
       } else {
-        console.log('⚠️ No results found - creating helpful message');
-        
-        // Create a helpful "no results" message
-        const noResultsMessage: SearchResult = {
-          id: 'no_results_found',
+        // No results found
+        const noResults: SearchResult = {
+          id: 'no_results',
           title: '🔍 No Results Found',
-          content: `No relevant documents found for your query: "${searchQuery}"
+          content: `No results found for "${searchQuery}".
 
-**Possible reasons:**
-1. **Different keywords**: Try using different or simpler terms
-2. **Document content**: The uploaded documents might not contain information about "${searchQuery}"
-3. **Indexing delay**: If you just uploaded files, wait a moment and try again
+Try:
+- Different keywords
+- Simpler terms
+- Check if documents contain this information
+- Upload more documents
 
-**Suggestions:**
-- Try broader terms like "voltage", "system", "safety", "specifications"
-- Check if your documents actually contain the information you're looking for
-- Use the test document first to verify search is working
-
-**Available documents:** ${backendStats?.totalFiles || 0} files with ${backendStats?.totalChunks || 0} searchable chunks`,
-          system: 'Search Helper',
+Available: ${backendStats?.totalFiles || 0} files, ${backendStats?.totalChunks || 0} chunks`,
+          system: 'Search',
           subsystem: 'No Results',
-          score: 0.5,
-          fileType: 'Helper',
-          preview: `No documents found matching "${searchQuery}". Try different keywords or check document content.`,
+          score: 0,
+          fileType: 'Message',
+          preview: `No results for "${searchQuery}". Try different keywords.`,
           sources: []
         };
         
-        setResults([noResultsMessage]);
-        toast(`🔍 No results for "${searchQuery}". Try different keywords or check the suggestions in Results tab.`);
+        setResults([noResults]);
+        setActiveTab('results');
+        toast('🔍 No results found. Try different keywords.');
       }
       
     } catch (error: any) {
-      console.error('Search failed:', error);
+      console.error('❌ Search error:', error);
+      toast.error(`Search failed: ${error.message}`);
       
-      if (error.message.includes('Index is empty') || error.message.includes('Ingest files first')) {
-        // Create helpful error result
-        const errorResult: SearchResult = {
-          id: 'error_no_index',
-          title: '⚠️ Search Error - Empty Index',
-          content: `The search index is currently empty. This means no documents have been processed yet.
+      // Show error result
+      const errorResult: SearchResult = {
+        id: 'search_error',
+        title: '❌ Search Error',
+        content: `Search failed: ${error.message}
 
-**To fix this:**
-1. Upload documents using the Upload tab, OR
-2. Use Google Drive integration to analyze files directly
+This might be because:
+1. No documents are uploaded yet
+2. Backend connection issue
+3. Documents are still being indexed
 
-**Your search query:** "${searchQuery}"
-**Search type:** ${searchType}
-
-Once you have documents indexed, this search will work perfectly!`,
-          system: 'Error Handler',
-          subsystem: 'Index',
-          score: 0.5,
-          fileType: 'Error',
-          preview: 'Search index is empty. Upload documents to enable search.',
-          sources: []
-        };
-        
-        setResults([errorResult]);
-        setActiveTab('results');
-        toast.error('📭 No documents indexed. Upload files or use Google Drive analysis first.');
-      } else {
-        toast.error(`❌ Search failed: ${error.message}`);
-      }
+Try uploading documents first using the Google Drive tab.`,
+        system: 'Error',
+        subsystem: 'Search Failed',
+        score: 0,
+        fileType: 'Error',
+        preview: `Search failed: ${error.message}`,
+        sources: []
+      };
+      
+      setResults([errorResult]);
+      setActiveTab('results');
     } finally {
       setIsProcessing(false);
     }
@@ -1256,59 +1153,57 @@ Query: ${searchQuery}
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6">AI-Powered Search</h2>
               
-              <div className="flex gap-4">
-                <input
-                  type="text"
-                  placeholder="Ask anything about your documents..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('🔥 SEARCH BUTTON CLICKED - BULLETPROOF!');
-                    handleSearch();
-                  }}
-                  disabled={isProcessing}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
-                  Search
-                </button>
-              </div>
-              
-              {/* DEBUG: Test Search Button */}
-              <div className="mt-4 p-3 bg-yellow-600/20 border border-yellow-400/20 rounded-lg">
-                <h4 className="text-yellow-300 font-medium mb-2">🔧 DEBUG: Test AI Search</h4>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('🧪 DEBUG SEARCH CLICKED!');
-                    
-                    // Set a test query
-                    setSearchQuery('What is the operating voltage?');
-                    
-                    // Wait a moment then search
-                    setTimeout(() => {
-                      console.log('🧪 Executing test search...');
-                      handleSearch();
-                    }, 100);
-                  }}
-                  disabled={isProcessing}
-                  className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
-                  🧪 TEST SEARCH: "What is the operating voltage?"
-                </button>
-                <p className="text-yellow-200 text-xs mt-2">
-                  This button sets a test query and searches. Check browser console (F12) for detailed logs.
-                </p>
+              {/* SIMPLE AI SEARCH INPUT */}
+              <div className="space-y-4">
+                <div className="flex gap-4">
+                  <input
+                    type="text"
+                    placeholder="Ask anything about your documents..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !isProcessing) {
+                        handleSearch();
+                      }
+                    }}
+                    className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSearch}
+                    disabled={isProcessing || !searchQuery.trim()}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
+                  >
+                    {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+                    {isProcessing ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
+                
+                {/* QUICK TEST BUTTONS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('What is the operating voltage?');
+                      setTimeout(() => handleSearch(), 100);
+                    }}
+                    disabled={isProcessing}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm"
+                  >
+                    🧪 Test: "What is the operating voltage?"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('Describe the safety systems');
+                      setTimeout(() => handleSearch(), 100);
+                    }}
+                    disabled={isProcessing}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm"
+                  >
+                    🧪 Test: "Describe the safety systems"
+                  </button>
+                </div>
               </div>
 
               {/* Search Type Options */}
