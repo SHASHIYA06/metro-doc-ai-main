@@ -672,7 +672,7 @@ The AI will search through your documents and provide intelligent answers.`,
         },
         body: JSON.stringify({
           query: searchQuery,
-          k: 10,
+          k: 5, // FIXED: Use k=5 instead of k=10 (backend threshold issue)
           system: '', // Search ALL systems
           subsystem: '', // Search ALL subsystems
           tags: []
@@ -687,12 +687,50 @@ The AI will search through your documents and provide intelligent answers.`,
       
       const data = await response.json();
       console.log('📊 Search response:', data);
+      console.log('📊 Response details:', {
+        hasResult: !!data.result,
+        resultLength: data.result?.length || 0,
+        sourcesCount: data.sources?.length || 0,
+        used: data.used || 0,
+        totalIndexed: data.totalIndexed || 0,
+        resultPreview: data.result?.substring(0, 100) || 'No result'
+      });
       
       // Create results array
       const searchResults: SearchResult[] = [];
       
-      // Add AI response if available
-      if (data.result && data.result.trim()) {
+      // Check if backend returned "No relevant documents found" message
+      if (data.result && data.result.includes('No relevant documents found')) {
+        console.log('⚠️ Backend returned "No relevant documents found" - this is a backend search algorithm issue');
+        
+        // Create helpful message explaining the issue
+        const backendIssueResult: SearchResult = {
+          id: 'backend_no_results',
+          title: '🔍 Backend Search Issue',
+          content: `The backend search algorithm couldn't find matches for "${searchQuery}".
+
+This can happen when:
+1. **Search algorithm threshold**: The backend has strict matching requirements
+2. **Document indexing**: Documents might not be indexed with the right keywords
+3. **Query complexity**: Try simpler, more direct terms
+
+**Suggestions:**
+- Try single words: "voltage", "safety", "system"
+- Use exact terms from your documents
+- Try broader queries: "specifications", "technical", "metro"
+
+**Available documents:** ${data.totalIndexed || 0} chunks indexed
+**Backend message:** ${data.result}`,
+          system: 'Search Issue',
+          subsystem: 'Backend Algorithm',
+          score: 0.5,
+          fileType: 'Diagnostic',
+          preview: `Backend search algorithm issue. Try simpler keywords for "${searchQuery}".`,
+          sources: []
+        };
+        
+        searchResults.push(backendIssueResult);
+      } else if (data.result && data.result.trim()) {
         // Clean HTML from result
         const cleanResult = data.result.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n').trim();
         
