@@ -651,20 +651,33 @@ The AI will search through your documents and provide intelligent answers.`,
   };
 
   const handleSearch = async () => {
+    console.log('🔥 SEARCH BUTTON CLICKED!');
+    console.log('Search query:', searchQuery);
+    console.log('Is processing:', isProcessing);
+    
     if (!searchQuery.trim()) {
+      console.log('❌ Empty search query');
       toast.error('Please enter a search query');
       return;
     }
 
+    console.log('✅ Search query valid, starting search...');
     setIsProcessing(true);
+    
     try {
       console.log('🔍 Starting enhanced AI search...');
       console.log('Query:', searchQuery);
       console.log('Search type:', searchType);
+      console.log('Backend stats:', backendStats);
       
       // Check if we have indexed documents
       if (!backendStats || backendStats.totalChunks === 0) {
-        console.warn('No documents indexed, suggesting alternative approach');
+        console.warn('❌ No documents indexed, showing help message');
+        console.log('Backend stats details:', {
+          exists: !!backendStats,
+          totalChunks: backendStats?.totalChunks,
+          totalFiles: backendStats?.totalFiles
+        });
         
         // Create a helpful result explaining the situation
         const helpResult: SearchResult = {
@@ -715,6 +728,12 @@ Your query "${searchQuery}" will work great once you have documents loaded!`,
       // Proceed with ADVANCED AI search using all features
       console.log('🚀 Using advanced AI search with all features...');
       console.log('📊 Backend stats:', backendStats);
+      console.log('🔧 Search parameters:', {
+        query: searchQuery,
+        searchType: searchType,
+        systemFilter: systemFilter,
+        subsystemFilter: subsystemFilter
+      });
       toast(`🧠 Processing with advanced AI (${searchType} mode)...`);
       
       // Extract search tags for better results
@@ -1203,13 +1222,49 @@ Query: ${searchQuery}
                   className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
                 <button
-                  onClick={handleSearch}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🔥 SEARCH BUTTON CLICKED - BULLETPROOF!');
+                    handleSearch();
+                  }}
                   disabled={isProcessing}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                 >
                   {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
                   Search
                 </button>
+              </div>
+              
+              {/* DEBUG: Test Search Button */}
+              <div className="mt-4 p-3 bg-yellow-600/20 border border-yellow-400/20 rounded-lg">
+                <h4 className="text-yellow-300 font-medium mb-2">🔧 DEBUG: Test AI Search</h4>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🧪 DEBUG SEARCH CLICKED!');
+                    
+                    // Set a test query
+                    setSearchQuery('What is the operating voltage?');
+                    
+                    // Wait a moment then search
+                    setTimeout(() => {
+                      console.log('🧪 Executing test search...');
+                      handleSearch();
+                    }, 100);
+                  }}
+                  disabled={isProcessing}
+                  className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                  🧪 TEST SEARCH: "What is the operating voltage?"
+                </button>
+                <p className="text-yellow-200 text-xs mt-2">
+                  This button sets a test query and searches. Check browser console (F12) for detailed logs.
+                </p>
               </div>
 
               {/* Search Type Options */}
