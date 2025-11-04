@@ -650,7 +650,7 @@ The AI will search through your documents and provide intelligent answers.`,
     }
   };
 
-  // SIMPLE, BULLETPROOF AI SEARCH FUNCTION
+  // INTELLIGENT AI SEARCH WITH FALLBACK STRATEGIES
   const handleSearch = async () => {
     console.log('🔥 AI SEARCH STARTED!');
     
@@ -664,29 +664,146 @@ The AI will search through your documents and provide intelligent answers.`,
     try {
       console.log('🔍 Searching for:', searchQuery);
       
-      // Direct API call to backend - SIMPLE AND BULLETPROOF
-      const response = await fetch(`${config.API_BASE_URL}/ask`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          query: searchQuery,
-          k: 5, // FIXED: Use k=5 instead of k=10 (backend threshold issue)
-          system: '', // Search ALL systems
-          subsystem: '', // Search ALL subsystems
-          tags: []
-        })
-      });
+      // Try multiple search strategies to get results
+      let searchResult = null;
+      let searchAttempts = [];
       
-      console.log('📡 Response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`Search failed: ${response.status}`);
+      // Strategy 1: Original query with k=5
+      console.log('📊 Strategy 1: Original query with k=5');
+      try {
+        const response1 = await fetch(`${config.API_BASE_URL}/ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: searchQuery,
+            k: 5,
+            system: '',
+            subsystem: '',
+            tags: []
+          })
+        });
+        
+        const data1 = await response1.json();
+        searchAttempts.push({ strategy: 'Original k=5', result: data1 });
+        
+        if (data1.result && !data1.result.includes('No relevant documents found') && data1.sources?.length > 0) {
+          searchResult = data1;
+          console.log('✅ Strategy 1 SUCCESS');
+        }
+      } catch (e) {
+        console.log('❌ Strategy 1 failed:', e.message);
       }
       
-      const data = await response.json();
-      console.log('📊 Search response:', data);
+      // Strategy 2: If no results, try with k=3
+      if (!searchResult) {
+        console.log('📊 Strategy 2: Trying with k=3');
+        try {
+          const response2 = await fetch(`${config.API_BASE_URL}/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: searchQuery,
+              k: 3,
+              system: '',
+              subsystem: '',
+              tags: []
+            })
+          });
+          
+          const data2 = await response2.json();
+          searchAttempts.push({ strategy: 'k=3', result: data2 });
+          
+          if (data2.result && !data2.result.includes('No relevant documents found') && data2.sources?.length > 0) {
+            searchResult = data2;
+            console.log('✅ Strategy 2 SUCCESS');
+          }
+        } catch (e) {
+          console.log('❌ Strategy 2 failed:', e.message);
+        }
+      }
+      
+      // Strategy 3: If still no results, try simplified query (extract key words)
+      if (!searchResult) {
+        console.log('📊 Strategy 3: Trying simplified query');
+        const keyWords = searchQuery.toLowerCase()
+          .split(/\s+/)
+          .filter(word => word.length > 2)
+          .filter(word => !['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'she', 'use', 'way', 'what', 'when', 'with'].includes(word));
+        
+        const simplifiedQuery = keyWords.slice(0, 2).join(' ') || keyWords[0] || searchQuery;
+        console.log('🔍 Simplified query:', simplifiedQuery);
+        
+        try {
+          const response3 = await fetch(`${config.API_BASE_URL}/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: simplifiedQuery,
+              k: 5,
+              system: '',
+              subsystem: '',
+              tags: []
+            })
+          });
+          
+          const data3 = await response3.json();
+          searchAttempts.push({ strategy: 'Simplified', result: data3 });
+          
+          if (data3.result && !data3.result.includes('No relevant documents found') && data3.sources?.length > 0) {
+            searchResult = data3;
+            console.log('✅ Strategy 3 SUCCESS with simplified query');
+          }
+        } catch (e) {
+          console.log('❌ Strategy 3 failed:', e.message);
+        }
+      }
+      
+      // Strategy 4: If still no results, try just the first key word
+      if (!searchResult && keyWords && keyWords.length > 0) {
+        console.log('📊 Strategy 4: Trying single keyword');
+        const singleWord = keyWords[0];
+        console.log('🔍 Single word query:', singleWord);
+        
+        try {
+          const response4 = await fetch(`${config.API_BASE_URL}/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: singleWord,
+              k: 5,
+              system: '',
+              subsystem: '',
+              tags: []
+            })
+          });
+          
+          const data4 = await response4.json();
+          searchAttempts.push({ strategy: 'Single word', result: data4 });
+          
+          if (data4.result && !data4.result.includes('No relevant documents found') && data4.sources?.length > 0) {
+            searchResult = data4;
+            console.log('✅ Strategy 4 SUCCESS with single word');
+          }
+        } catch (e) {
+          console.log('❌ Strategy 4 failed:', e.message);
+        }
+      }
+      
+      console.log('📊 All search attempts:', searchAttempts.map(a => ({ 
+        strategy: a.strategy, 
+        hasResult: !!a.result.result,
+        resultLength: a.result.result?.length || 0,
+        sources: a.result.sources?.length || 0
+      })));
+      
+      // Use the best result we found
+      const data = searchResult || searchAttempts[searchAttempts.length - 1]?.result;
+      
+      if (!data) {
+        throw new Error('All search strategies failed');
+      }
+      
+      console.log('📊 Final search response:', data);
       console.log('📊 Response details:', {
         hasResult: !!data.result,
         resultLength: data.result?.length || 0,
@@ -699,44 +816,14 @@ The AI will search through your documents and provide intelligent answers.`,
       // Create results array
       const searchResults: SearchResult[] = [];
       
-      // Check if backend returned "No relevant documents found" message
-      if (data.result && data.result.includes('No relevant documents found')) {
-        console.log('⚠️ Backend returned "No relevant documents found" - this is a backend search algorithm issue');
-        
-        // Create helpful message explaining the issue
-        const backendIssueResult: SearchResult = {
-          id: 'backend_no_results',
-          title: '🔍 Backend Search Issue',
-          content: `The backend search algorithm couldn't find matches for "${searchQuery}".
-
-This can happen when:
-1. **Search algorithm threshold**: The backend has strict matching requirements
-2. **Document indexing**: Documents might not be indexed with the right keywords
-3. **Query complexity**: Try simpler, more direct terms
-
-**Suggestions:**
-- Try single words: "voltage", "safety", "system"
-- Use exact terms from your documents
-- Try broader queries: "specifications", "technical", "metro"
-
-**Available documents:** ${data.totalIndexed || 0} chunks indexed
-**Backend message:** ${data.result}`,
-          system: 'Search Issue',
-          subsystem: 'Backend Algorithm',
-          score: 0.5,
-          fileType: 'Diagnostic',
-          preview: `Backend search algorithm issue. Try simpler keywords for "${searchQuery}".`,
-          sources: []
-        };
-        
-        searchResults.push(backendIssueResult);
-      } else if (data.result && data.result.trim()) {
+      // Check if we got a good result
+      if (searchResult && data.result && !data.result.includes('No relevant documents found')) {
         // Clean HTML from result
         const cleanResult = data.result.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n').trim();
         
         searchResults.push({
           id: 'ai_response',
-          title: '🤖 AI Analysis',
+          title: `🤖 AI Analysis${searchResult !== searchAttempts[0]?.result ? ' (Alternative Strategy)' : ''}`,
           content: cleanResult,
           system: 'AI Response',
           subsystem: 'Generated',
@@ -750,6 +837,42 @@ This can happen when:
             preview: cleanResult.substring(0, 200)
           }]
         });
+      } else {
+        // No good results found with any strategy
+        console.log('⚠️ All search strategies failed to find relevant results');
+        
+        const noResultsMessage: SearchResult = {
+          id: 'intelligent_no_results',
+          title: '🔍 No Results Found (Tried Multiple Strategies)',
+          content: `I tried multiple search strategies for "${searchQuery}" but couldn't find relevant matches:
+
+**Search Strategies Attempted:**
+${searchAttempts.map((attempt, index) => 
+  `${index + 1}. ${attempt.strategy}: ${attempt.result.sources?.length || 0} sources, ${attempt.result.result?.length || 0} chars`
+).join('\n')}
+
+**Suggestions to get better results:**
+1. **Try simpler terms**: Instead of "surge voltage", try just "voltage"
+2. **Use document keywords**: Try terms that are likely in your documents
+3. **Broader queries**: "electrical", "system", "specifications", "technical"
+4. **Check document content**: Make sure your documents contain the information you're looking for
+
+**Available documents:** ${data.totalIndexed || 0} chunks from ${backendStats?.totalFiles || 0} files
+
+**Quick tests you can try:**
+- "voltage" (single word)
+- "safety" (common term)
+- "system" (broad term)
+- "specifications" (technical docs often have this)`,
+          system: 'Intelligent Search',
+          subsystem: 'No Results',
+          score: 0.5,
+          fileType: 'Search Help',
+          preview: `Tried multiple search strategies for "${searchQuery}" but no relevant matches found. Try simpler terms.`,
+          sources: []
+        };
+        
+        searchResults.push(noResultsMessage);
       }
       
       // Add source documents
