@@ -670,6 +670,12 @@ The AI will search through your documents and provide intelligent answers.`,
       console.log('Search type:', searchType);
       console.log('Backend stats:', backendStats);
       
+      // Log what systems are actually in the backend
+      if (backendStats?.bySystem) {
+        console.log('📊 Available systems in backend:', Object.keys(backendStats.bySystem));
+        console.log('📊 System details:', backendStats.bySystem);
+      }
+      
       // Check if we have indexed documents
       if (!backendStats || backendStats.totalChunks === 0) {
         console.warn('❌ No documents indexed, showing help message');
@@ -745,10 +751,19 @@ Your query "${searchQuery}" will work great once you have documents loaded!`,
       if (/motor|drive/i.test(searchQuery)) searchTags.push('traction');
       searchTags.push(searchType);
       
+      // Don't filter by system/subsystem to search ALL documents
+      console.log('🔍 Search parameters being sent:', {
+        query: searchQuery,
+        k: 20,
+        system: '', // Empty to search all systems
+        subsystem: '', // Empty to search all subsystems
+        tags: searchTags
+      });
+      
       const response = await apiService.search(searchQuery, { 
         k: 20, // More results for better analysis
-        system: systemFilter || 'Google Drive Analysis',
-        subsystem: subsystemFilter || 'AI Search Ready',
+        system: '', // Search ALL systems (don't filter)
+        subsystem: '', // Search ALL subsystems (don't filter)
         tags: searchTags
       });
       
@@ -819,8 +834,37 @@ Your query "${searchQuery}" will work great once you have documents loaded!`,
         if (convertedResults[0].id === 'ai_response') {
           toast.success(`🤖 AI generated comprehensive analysis`);
         }
+        console.log('✅ Results found and displayed successfully');
       } else {
-        toast('No results found. Try different keywords or check if documents are properly indexed.');
+        console.log('⚠️ No results found - creating helpful message');
+        
+        // Create a helpful "no results" message
+        const noResultsMessage: SearchResult = {
+          id: 'no_results_found',
+          title: '🔍 No Results Found',
+          content: `No relevant documents found for your query: "${searchQuery}"
+
+**Possible reasons:**
+1. **Different keywords**: Try using different or simpler terms
+2. **Document content**: The uploaded documents might not contain information about "${searchQuery}"
+3. **Indexing delay**: If you just uploaded files, wait a moment and try again
+
+**Suggestions:**
+- Try broader terms like "voltage", "system", "safety", "specifications"
+- Check if your documents actually contain the information you're looking for
+- Use the test document first to verify search is working
+
+**Available documents:** ${backendStats?.totalFiles || 0} files with ${backendStats?.totalChunks || 0} searchable chunks`,
+          system: 'Search Helper',
+          subsystem: 'No Results',
+          score: 0.5,
+          fileType: 'Helper',
+          preview: `No documents found matching "${searchQuery}". Try different keywords or check document content.`,
+          sources: []
+        };
+        
+        setResults([noResultsMessage]);
+        toast(`🔍 No results for "${searchQuery}". Try different keywords or check the suggestions in Results tab.`);
       }
       
     } catch (error: any) {
