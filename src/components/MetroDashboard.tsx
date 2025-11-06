@@ -729,8 +729,24 @@ The AI will search through your documents and provide intelligent answers.`,
         let questionQuery = '';
         const lowerQuery = searchQuery.toLowerCase();
         
-        // Convert common patterns to questions that work
-        if (lowerQuery.includes('voltage')) {
+        // Convert common patterns to questions that work with the backend
+        if (lowerQuery.includes('door') && (lowerQuery.includes('detail') || lowerQuery.includes('system') || lowerQuery.includes('specification'))) {
+          questionQuery = 'What are the door system details and specifications?';
+        } else if (lowerQuery.includes('door') && (lowerQuery.includes('troubleshoot') || lowerQuery.includes('problem') || lowerQuery.includes('issue'))) {
+          questionQuery = 'What are the door troubleshooting procedures?';
+        } else if (lowerQuery.includes('dcu') && (lowerQuery.includes('failure') || lowerQuery.includes('fault') || lowerQuery.includes('error'))) {
+          questionQuery = 'What are the DCU failure troubleshooting procedures?';
+        } else if (lowerQuery.includes('door') && lowerQuery.includes('operation')) {
+          questionQuery = 'What are the door operation procedures?';
+        } else if (lowerQuery.includes('surge') && (lowerQuery.includes('detail') || lowerQuery.includes('system') || lowerQuery.includes('protection'))) {
+          questionQuery = 'What are the surge protection system details?';
+        } else if (lowerQuery.includes('surge') && (lowerQuery.includes('troubleshoot') || lowerQuery.includes('problem'))) {
+          questionQuery = 'What are the surge troubleshooting procedures?';
+        } else if (lowerQuery.includes('b8') && (lowerQuery.includes('service') || lowerQuery.includes('checklist') || lowerQuery.includes('procedure'))) {
+          questionQuery = 'What are the B8 service checklist procedures?';
+        } else if (lowerQuery.includes('maintenance') && (lowerQuery.includes('procedure') || lowerQuery.includes('checklist'))) {
+          questionQuery = 'What are the maintenance procedures?';
+        } else if (lowerQuery.includes('voltage')) {
           questionQuery = 'What is the operating voltage?';
         } else if (lowerQuery.includes('safety') || lowerQuery.includes('emergency')) {
           questionQuery = 'What are the safety systems?';
@@ -874,10 +890,22 @@ The AI will search through your documents and provide intelligent answers.`,
         // No good results found with any strategy
         console.log('⚠️ All search strategies failed to find relevant results');
         
+        // Check if backend has any files at all
+        let backendHasFiles = false;
+        try {
+          const statsResponse = await fetch(`${config.API_BASE_URL}/stats`);
+          const stats = await statsResponse.json();
+          backendHasFiles = stats.totalChunks > 0;
+          console.log('📊 Backend stats:', stats);
+        } catch (e) {
+          console.log('❌ Could not check backend stats:', e.message);
+        }
+        
         const noResultsMessage: SearchResult = {
           id: 'intelligent_no_results',
-          title: '🔍 No Results Found - Backend Algorithm Issue',
-          content: `I tried multiple intelligent search strategies for "${searchQuery}" but the backend search algorithm couldn't find matches:
+          title: backendHasFiles ? '🔍 No Results Found - Backend Algorithm Issue' : '📁 No Files Uploaded Yet',
+          content: backendHasFiles ? 
+            `I tried multiple intelligent search strategies for "${searchQuery}" but couldn't find relevant matches:
 
 **Search Strategies Attempted:**
 ${searchAttempts.map((attempt, index) => 
@@ -886,18 +914,46 @@ ${searchAttempts.map((attempt, index) =>
 
 **Backend Algorithm Behavior:**
 The backend search works best with complete questions starting with "What":
-- ✅ "What is the operating voltage?" → Works perfectly
+- ✅ "What are the door system details?" → Works perfectly
 - ✅ "What are the technical specifications?" → Works perfectly  
-- ❌ "voltage", "DCU failure", "safety" → Don't work
+- ✅ "What are the DCU failure procedures?" → Works perfectly
+- ❌ "door details", "DCU failure", "safety" → May not work
 
 **Try These Working Query Formats:**
-- **"What is the operating voltage?"**
-- **"What are the safety systems?"**
-- **"What are the technical specifications?"**
-- **"What is the control system?"**
-- **"What are the electrical specifications?"**
+- **"What are the door system details and specifications?"**
+- **"What are the DCU failure troubleshooting procedures?"**
+- **"What are the surge protection system details?"**
+- **"What are the B8 service checklist procedures?"**
+- **"What are the maintenance procedures?"**
 
 **For "${searchQuery}", try:**
+${searchQuery.toLowerCase().includes('door') ? '- "What are the door system details and specifications?"' :
+  searchQuery.toLowerCase().includes('surge') ? '- "What are the surge protection system details?"' :
+  searchQuery.toLowerCase().includes('dcu') ? '- "What are the DCU failure troubleshooting procedures?"' :
+  searchQuery.toLowerCase().includes('b8') ? '- "What are the B8 service checklist procedures?"' :
+  searchQuery.toLowerCase().includes('maintenance') ? '- "What are the maintenance procedures?"' :
+  searchQuery.toLowerCase().includes('safety') ? '- "What are the safety systems?"' :
+  searchQuery.toLowerCase().includes('voltage') ? '- "What is the operating voltage?"' :
+  '- "What are the technical specifications?"'}` :
+            `No files have been uploaded to the AI system yet. To get search results, you need to upload your documents first.
+
+**📋 How to Upload Files:**
+1. Go to the **Google Drive** tab above
+2. Connect to your Google Drive account
+3. Select the files you want to search (B8 Service Checklist, Surge documents, etc.)
+4. Click **"🚀 LOAD SELECTED FILES FOR AI SEARCH"**
+5. Wait for the upload to complete
+6. Come back to this **AI Search** tab
+7. Search for your specific information
+
+**📝 Example Searches After Upload:**
+- **"What are the door system details?"** (for B8 Service Checklist)
+- **"What are the surge protection procedures?"** (for Surge documents)
+- **"What are the DCU failure troubleshooting steps?"**
+- **"What are the maintenance procedures?"**
+
+**💡 Pro Tip:**
+The AI search works best with complete questions starting with "What are..." or "What is..."`
 ${searchQuery.toLowerCase().includes('voltage') ? '- "What is the operating voltage?"' :
   searchQuery.toLowerCase().includes('safety') ? '- "What are the safety systems?"' :
   searchQuery.toLowerCase().includes('dcu') || searchQuery.toLowerCase().includes('failure') ? '- "What are the failure modes and troubleshooting procedures?"' :
