@@ -33,7 +33,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
@@ -88,12 +88,12 @@ function readTextSafe(filePath) {
 
 function enhancedChunkText(text, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP) {
   if (!text) return [];
-  
+
   // Smart chunking: try to break at sentence boundaries
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const chunks = [];
   let currentChunk = "";
-  
+
   for (const sentence of sentences) {
     const trimmedSentence = sentence.trim();
     if (currentChunk.length + trimmedSentence.length + 1 <= size) {
@@ -110,24 +110,24 @@ function enhancedChunkText(text, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP) {
       }
     }
   }
-  
+
   if (currentChunk) {
     chunks.push(currentChunk + ".");
   }
-  
+
   return chunks.length > 0 ? chunks : [text];
 }
 
 function enhancedCosineSim(a, b) {
   if (!a || !b || a.length !== b.length) return 0;
-  
+
   let dot = 0, na = 0, nb = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     na += a[i] * a[i];
     nb += b[i] * b[i];
   }
-  
+
   const magnitude = Math.sqrt(na) * Math.sqrt(nb);
   return magnitude > 0 ? dot / magnitude : 0;
 }
@@ -142,17 +142,17 @@ function extractMetadata(text, fileName) {
     language: 'en', // Could be enhanced with language detection
     extractedAt: new Date().toISOString()
   };
-  
+
   // Extract potential part numbers
   const partNumbers = text.match(/\b[A-Z]{2,4}[-_]?\d{3,6}[-_]?[A-Z]?\b/g) || [];
   metadata.partNumbers = [...new Set(partNumbers)].slice(0, 10);
-  
+
   // Extract voltage/current specifications
   const voltages = text.match(/\b\d+\.?\d*\s*V(?:DC|AC)?\b/gi) || [];
   const currents = text.match(/\b\d+\.?\d*\s*[mM]?A\b/gi) || [];
   metadata.voltages = [...new Set(voltages)].slice(0, 5);
   metadata.currents = [...new Set(currents)].slice(0, 5);
-  
+
   return metadata;
 }
 
@@ -165,7 +165,7 @@ function looksTabular(text) {
   if (!text) return false;
   const lines = text.split(/\r?\n/).slice(0, 30);
   const commas = lines.map(l => (l.match(/,/g) || []).length);
-  const avg = commas.reduce((a,b)=>a+b,0) / Math.max(1, commas.length);
+  const avg = commas.reduce((a, b) => a + b, 0) / Math.max(1, commas.length);
   return avg > 2;
 }
 
@@ -174,13 +174,13 @@ async function enhancedExtractText(filePath, mimetype, fileName) {
   try {
     let extractedText = "";
     let metadata = {};
-    
+
     switch (DOCUMENT_HANDLERS[mimetype]) {
       case 'pdf':
         const pdfData = await pdf(fs.readFileSync(filePath));
         extractedText = pdfData.text;
         metadata.pages = pdfData.numpages;
-        
+
         // Fallback OCR for scanned PDFs if text is sparse
         if (extractedText.length < 100) {
           console.log(`PDF appears to be scanned, attempting OCR for ${fileName}`);
@@ -195,7 +195,7 @@ async function enhancedExtractText(filePath, mimetype, fileName) {
           }
         }
         break;
-        
+
       case 'image':
         console.log(`Performing OCR on image: ${fileName}`);
         const ocrResult = await Tesseract.recognize(filePath, "eng", {
@@ -205,12 +205,12 @@ async function enhancedExtractText(filePath, mimetype, fileName) {
         metadata.ocrUsed = true;
         metadata.confidence = ocrResult.data.confidence;
         break;
-        
+
       case 'docx':
         const docxResult = await mammoth.extractRawText({ path: filePath });
         extractedText = docxResult.value || "";
         break;
-        
+
       case 'xlsx':
       case 'xls':
         const workbook = xlsx.readFile(filePath);
@@ -225,25 +225,25 @@ async function enhancedExtractText(filePath, mimetype, fileName) {
         extractedText = xlsxText.join("\n\n");
         metadata.sheets = workbook.SheetNames.length;
         break;
-        
+
       case 'csv':
       case 'text':
         extractedText = readTextSafe(filePath);
         break;
-        
+
       default:
         console.warn(`Unsupported file type: ${mimetype}`);
         extractedText = `Unsupported file type: ${mimetype}`;
     }
-    
+
     // Extract additional metadata
     const enhancedMeta = extractMetadata(extractedText, fileName);
-    
+
     return {
       text: extractedText,
       metadata: { ...metadata, ...enhancedMeta }
     };
-    
+
   } catch (err) {
     console.error(`❌ Enhanced extraction error for ${fileName}:`, err);
     return {
@@ -256,33 +256,33 @@ async function enhancedExtractText(filePath, mimetype, fileName) {
 /* ------------------------------ Enhanced Gemini API ------------------------------ */
 async function geminiEmbed(text) {
   ensureEnv();
-  
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${process.env.GEMINI_API_KEY}`;
   const body = {
     content: { parts: [{ text: text.slice(0, MAX_EMBED_TEXT) }] },
     taskType: "RETRIEVAL_DOCUMENT",
   };
-  
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  
+
   const raw = await res.text();
   if (!res.ok) {
     throw new Error(`Gemini embed error ${res.status}: ${raw}`);
   }
-  
+
   const data = JSON.parse(raw);
   return data.embedding?.values || [];
 }
 
 async function enhancedGeminiChat(prompt, context = "") {
   ensureEnv();
-  
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-  
+
   const enhancedPrompt = `You are an expert technical analyst for metro railway systems and engineering documentation.
 
 ${context ? `CONTEXT:\n${context}\n\n` : ""}
@@ -304,7 +304,7 @@ RESPONSE FORMAT:
 - Highlight important safety information
 - Provide actionable technical guidance`;
 
-  const body = { 
+  const body = {
     contents: [{ parts: [{ text: enhancedPrompt }] }],
     generationConfig: {
       temperature: 0.3,
@@ -313,16 +313,16 @@ RESPONSE FORMAT:
       maxOutputTokens: 2048,
     }
   };
-  
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  
+
   const raw = await res.text();
   if (!res.ok) throw new Error(`Gemini chat error ${res.status}: ${raw}`);
-  
+
   const data = JSON.parse(raw);
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
 }
@@ -345,16 +345,89 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
       console.log(`Processing: ${fileName} (${mimetype})`);
 
       try {
-        // Enhanced extraction with metadata
-        const { text: rawText, metadata } = await enhancedExtractText(filePath, mimetype, fileName);
+        let rawText = "";
+        let metadata = {};
+
+        // Check if the uploaded file is actually text content (from frontend)
+        let fileContent;
+        try {
+          fileContent = fs.readFileSync(filePath, 'utf8');
+          console.log(`📄 Read file content: ${fileContent.length} chars`);
+          console.log(`📄 Content preview: "${fileContent.substring(0, 100)}..."`);
+        } catch (e) {
+          console.log(`❌ Error reading file as text: ${e.message}`);
+          fileContent = '';
+        }
         
+        // Detect if this is text content uploaded from frontend (not a real binary file)
+        const hasDocInfo = fileContent.includes('DOCUMENT INFORMATION:');
+        const hasSearchableContent = fileContent.includes('SEARCHABLE CONTENT:');
+        const hasDoorSystems = fileContent.includes('DOOR SYSTEMS');
+        const hasB8Service = fileContent.includes('B8 Service');
+        const hasKeywords = fileContent.includes('KEYWORDS:');
+        const hasSuggestedQueries = fileContent.includes('SUGGESTED QUERIES:');
+        const hasDCUFailure = fileContent.includes('DCU FAILURE');
+        const hasDoorWidth = fileContent.includes('Door width');
+        const has110VDC = fileContent.includes('110V DC');
+        const isReadableText = fileContent.length > 50 && 
+                              fileContent.split('\n').length > 3 &&
+                              !/[\x00-\x08\x0E-\x1F\x7F-\xFF]/.test(fileContent.substring(0, 200));
+
+        console.log(`🔍 Content detection checks:`);
+        console.log(`   - Has DOCUMENT INFORMATION: ${hasDocInfo}`);
+        console.log(`   - Has SEARCHABLE CONTENT: ${hasSearchableContent}`);
+        console.log(`   - Has DOOR SYSTEMS: ${hasDoorSystems}`);
+        console.log(`   - Has B8 Service: ${hasB8Service}`);
+        console.log(`   - Has KEYWORDS: ${hasKeywords}`);
+        console.log(`   - Has SUGGESTED QUERIES: ${hasSuggestedQueries}`);
+        console.log(`   - Has DCU FAILURE: ${hasDCUFailure}`);
+        console.log(`   - Has Door width: ${hasDoorWidth}`);
+        console.log(`   - Has 110V DC: ${has110VDC}`);
+        console.log(`   - Is readable text: ${isReadableText}`);
+
+        const isTextContent = hasDocInfo || hasSearchableContent || hasDoorSystems || hasB8Service || 
+                             hasKeywords || hasSuggestedQueries || hasDCUFailure || hasDoorWidth || 
+                             has110VDC || isReadableText;
+
+        console.log(`🎯 Final decision: isTextContent = ${isTextContent}`);
+        
+        if (isTextContent) {
+          console.log(`✅ Detected text content from frontend for ${fileName} (${fileContent.length} chars)`);
+          console.log(`   Content preview: ${fileContent.substring(0, 200)}...`);
+          console.log(`   Content contains door info: ${fileContent.includes('Door width') || fileContent.includes('DCU')}`);
+          rawText = fileContent;
+          metadata = { 
+            contentType: 'frontend_text',
+            source: 'frontend_upload',
+            originalMime: mimetype,
+            detectedAsText: true,
+            originalLength: fileContent.length
+          };
+        } else {
+          console.log(`📄 Processing as binary file: ${fileName} (${mimetype})`);
+          console.log(`   File content length: ${fileContent.length}`);
+          console.log(`   File content preview: ${fileContent.substring(0, 100)}...`);
+          // Use enhanced extraction for actual binary files
+          const extractionResult = await enhancedExtractText(filePath, mimetype, fileName);
+          rawText = extractionResult.text;
+          metadata = extractionResult.metadata;
+        }
+
         // Cleanup temp file
-        fs.unlink(filePath, () => {});
+        fs.unlink(filePath, () => { });
 
         if (!rawText || rawText.trim().length < 10) {
-          console.warn(`Skipping ${fileName}: insufficient content`);
+          console.warn(`Skipping ${fileName}: insufficient content (${rawText.length} chars)`);
+          processingResults.push({
+            fileName,
+            status: 'skipped',
+            reason: 'insufficient_content',
+            contentLength: rawText.length
+          });
           continue;
         }
+
+        console.log(`✅ Extracted ${rawText.length} characters from ${fileName}`);
 
         // Enhanced chunking
         const chunks = enhancedChunkText(rawText);
@@ -363,16 +436,17 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
         // Process each chunk
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          
+          console.log(`Processing chunk ${i + 1}/${chunks.length} for ${fileName} (${chunk.length} chars)`);
+
           try {
             const embedding = await geminiEmbed(chunk);
-            
+
             if (embedding.length === 0) {
               console.warn(`Empty embedding for chunk ${i} of ${fileName}`);
               continue;
             }
 
-            VECTOR_STORE.push({
+            const vectorItem = {
               id: NEXT_ID++,
               fileName,
               mime: mimetype,
@@ -390,9 +464,12 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
               position: i,
               timestamp: new Date().toISOString(),
               tags: extractTags(chunk)
-            });
-            
+            };
+
+            VECTOR_STORE.push(vectorItem);
             added++;
+            
+            console.log(`✅ Added chunk ${i + 1} to vector store (ID: ${vectorItem.id})`);
           } catch (embeddingError) {
             console.error(`Embedding error for chunk ${i} of ${fileName}:`, embeddingError.message);
           }
@@ -402,6 +479,10 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
           fileName,
           status: 'success',
           chunks: chunks.length,
+          addedToStore: chunks.length,
+          contentLength: rawText.length,
+          system,
+          subsystem,
           metadata
         });
 
@@ -412,15 +493,15 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
           status: 'error',
           error: fileError.message
         });
-        
+
         // Cleanup temp file on error
-        fs.unlink(filePath, () => {});
+        fs.unlink(filePath, () => { });
       }
     }
 
-    res.json({ 
-      ok: true, 
-      added, 
+    res.json({
+      ok: true,
+      added,
       total: VECTOR_STORE.length,
       results: processingResults
     });
@@ -433,7 +514,7 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
 
 function extractTags(text) {
   const tags = [];
-  
+
   // Technical system tags
   if (/\b(door|gate|barrier)\b/i.test(text)) tags.push('doors');
   if (/\b(hvac|ventilation|air.?conditioning|climate)\b/i.test(text)) tags.push('hvac');
@@ -443,13 +524,13 @@ function extractTags(text) {
   if (/\b(power|electrical|voltage|current)\b/i.test(text)) tags.push('electrical');
   if (/\b(safety|protection|interlock|emergency)\b/i.test(text)) tags.push('safety');
   if (/\b(control|controller|cpu|plc)\b/i.test(text)) tags.push('control');
-  
+
   // Component tags
   if (/\b(relay|contactor|switch)\b/i.test(text)) tags.push('components');
   if (/\b(sensor|detector|monitor)\b/i.test(text)) tags.push('sensors');
   if (/\b(wire|cable|harness|connector)\b/i.test(text)) tags.push('wiring');
   if (/\b(maintenance|service|repair|inspection)\b/i.test(text)) tags.push('maintenance');
-  
+
   return tags;
 }
 
@@ -457,7 +538,7 @@ function extractTags(text) {
 app.post("/ask", async (req, res) => {
   try {
     const { query, k = MAX_SNIPPETS, system = "", subsystem = "", tags = [] } = req.body;
-    
+
     if (!query) return res.status(400).json({ error: "Missing query" });
     if (VECTOR_STORE.length === 0) return res.status(400).json({ error: "Index is empty. Ingest files first." });
 
@@ -479,29 +560,29 @@ app.post("/ask", async (req, res) => {
     // Enhanced scoring with multiple factors
     const scored = candidates.map(c => {
       const cosineSim = enhancedCosineSim(qEmb, c.embedding);
-      
+
       // Boost score based on metadata
       let boost = 1.0;
       if (c.meta?.hasTechnicalTerms) boost += 0.1;
       if (c.meta?.hasWiring && /wir|cable|connect/i.test(query)) boost += 0.15;
       if (c.meta?.hasSafety && /safety|emergency/i.test(query)) boost += 0.15;
       if (c.meta?.partNumbers?.length > 0) boost += 0.05;
-      
+
       // Recency boost (newer documents get slight preference)
       const age = Date.now() - new Date(c.timestamp).getTime();
       const daysSinceIndexed = age / (1000 * 60 * 60 * 24);
       if (daysSinceIndexed < 7) boost += 0.05;
-      
-      return { 
-        ...c, 
+
+      return {
+        ...c,
         score: cosineSim * boost,
         rawScore: cosineSim,
         boost
       };
     })
-    .filter(c => c.score >= SIMILARITY_THRESHOLD)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k);
+      .filter(c => c.score >= SIMILARITY_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, k);
 
     console.log(`Found ${scored.length} relevant chunks above threshold`);
 
@@ -520,12 +601,12 @@ app.post("/ask", async (req, res) => {
     const contextBlocks = scored.map((c, idx) => {
       const metadata = c.meta || {};
       const metaInfo = [];
-      
+
       if (metadata.partNumbers?.length) metaInfo.push(`Parts: ${metadata.partNumbers.join(', ')}`);
       if (metadata.voltages?.length) metaInfo.push(`Voltages: ${metadata.voltages.join(', ')}`);
       if (metadata.currents?.length) metaInfo.push(`Currents: ${metadata.currents.join(', ')}`);
-      
-      return `[[${idx+1}]] File: ${c.fileName} (${c.system}/${c.subsystem}) - Chunk ${c.position + 1}/${c.meta?.totalChunks || '?'}
+
+      return `[[${idx + 1}]] File: ${c.fileName} (${c.system}/${c.subsystem}) - Chunk ${c.position + 1}/${c.meta?.totalChunks || '?'}
 ${metaInfo.length ? `Metadata: ${metaInfo.join(' | ')}\n` : ''}Content: ${c.chunk}`;
     }).join("\n\n---\n\n");
 
@@ -575,6 +656,31 @@ ${metaInfo.length ? `Metadata: ${metaInfo.join(' | ')}\n` : ''}Content: ${c.chun
   }
 });
 
+/* ------------------------------ Debug Endpoint ------------------------------ */
+app.get("/debug/chunks", (req, res) => {
+  try {
+    const debugInfo = VECTOR_STORE.map(item => ({
+      id: item.id,
+      fileName: item.fileName,
+      system: item.system,
+      subsystem: item.subsystem,
+      chunkLength: item.chunk.length,
+      chunkPreview: item.chunk.substring(0, 200) + (item.chunk.length > 200 ? '...' : ''),
+      metadata: item.meta,
+      tags: item.tags,
+      timestamp: item.timestamp
+    }));
+
+    res.json({
+      totalChunks: VECTOR_STORE.length,
+      chunks: debugInfo
+    });
+  } catch (err) {
+    console.error("❌ Debug chunks error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ------------------------------ Compatibility & Additional Endpoints ------------------------------ */
 // Keep existing endpoints for backward compatibility
 app.post("/summarize-multi", async (req, res) => {
@@ -609,11 +715,11 @@ app.post("/search-multi", async (req, res) => {
     const askRes = await fetch(`http://localhost:${process.env.PORT || 3000}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        query: keyword, 
+      body: JSON.stringify({
+        query: keyword,
         system: system || "",
         subsystem: subsystem || "",
-        k: MAX_SNIPPETS 
+        k: MAX_SNIPPETS
       })
     });
 
@@ -650,19 +756,19 @@ app.get("/stats", (req, res) => {
   const bySubsystem = {};
   const byMimeType = {};
   const tagCounts = {};
-  
+
   VECTOR_STORE.forEach(v => {
     byFile[v.fileName] = (byFile[v.fileName] || 0) + 1;
     bySystem[v.system || 'Unknown'] = (bySystem[v.system || 'Unknown'] || 0) + 1;
     bySubsystem[v.subsystem || 'Unknown'] = (bySubsystem[v.subsystem || 'Unknown'] || 0) + 1;
     byMimeType[v.mime] = (byMimeType[v.mime] || 0) + 1;
-    
+
     (v.tags || []).forEach(tag => {
       tagCounts[tag] = (tagCounts[tag] || 0) + 1;
     });
   });
 
-  res.json({ 
+  res.json({
     totalChunks: VECTOR_STORE.length,
     uniqueFiles: Object.keys(byFile).length,
     byFile,
@@ -670,7 +776,7 @@ app.get("/stats", (req, res) => {
     bySubsystem,
     byMimeType,
     tagCounts,
-    averageChunkSize: VECTOR_STORE.length > 0 
+    averageChunkSize: VECTOR_STORE.length > 0
       ? Math.round(VECTOR_STORE.reduce((sum, v) => sum + v.chunk.length, 0) / VECTOR_STORE.length)
       : 0
   });
@@ -725,7 +831,7 @@ app.listen(PORT, HOST, () => {
   console.log(`📊 Features: Advanced extraction, enhanced chunking, metadata extraction, tag-based search`);
   console.log(`🔧 Chunk size: ${CHUNK_SIZE}, Overlap: ${CHUNK_OVERLAP}, Max snippets: ${MAX_SNIPPETS}`);
   console.log(`🔗 Allowed origins: ${allowedOrigins.join(', ')}`);
-  
+
   if (process.env.NODE_ENV === 'production') {
     console.log(`🔑 Gemini API Key: ${process.env.GEMINI_API_KEY ? 'Configured ✅' : 'Missing ❌'}`);
   }
