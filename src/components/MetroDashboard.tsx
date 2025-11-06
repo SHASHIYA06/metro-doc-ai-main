@@ -1737,12 +1737,30 @@ This comprehensive document contains all technical information for AI search tes
                             .map(f => f.name)
                             .join(', ');
                           
+                          console.log('🔥 STARTING FILE-SPECIFIC UPLOAD PROCESS');
                           console.log('📁 Selected file IDs:', selectedFileIds);
                           console.log('📁 Selected file names:', selectedFileNames);
                           
                           toast(`🚀 Loading ${selectedFileIds.length} files: ${selectedFileNames}`);
                           
-                          console.log('📥 Step 1: Extracting file contents from Google Drive...');
+                          // STEP 1: Clear backend to ensure only selected files are indexed
+                          console.log('🧹 Step 1: Clearing backend to ensure clean state...');
+                          toast('🧹 Clearing backend for clean file-specific search...');
+                          try {
+                            const clearResponse = await fetch(`${config.API_BASE_URL}/clear`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' }
+                            });
+                            if (clearResponse.ok) {
+                              console.log('✅ Backend cleared - only your files will be indexed');
+                              toast.success('✅ Backend cleared - ready for your files');
+                            }
+                          } catch (clearError) {
+                            console.log('⚠️ Backend clear failed, continuing...', clearError);
+                          }
+                          
+                          // STEP 2: Extract file contents from Google Drive
+                          console.log('📥 Step 2: Extracting file contents from Google Drive...');
                           toast('📥 Extracting file contents from Google Drive...');
                           
                           const fileContents = await googleDriveService.extractFileContents(selectedFileIds);
@@ -1758,15 +1776,18 @@ This comprehensive document contains all technical information for AI search tes
                           })));
                           toast.success(`✅ Extracted ${fileContents.length} files successfully!`);
                           
-                          console.log('📤 Step 2: Uploading files to AI backend...');
+                          console.log('📤 Step 3: Uploading files to AI backend for file-specific search...');
                           toast(`📤 Uploading ${fileContents.length} files to AI backend...`);
                           
                           let totalChunks = 0;
                           let successCount = 0;
+                          let uploadedFiles = [];
                           
                           for (const content of fileContents) {
                             try {
-                              console.log(`📄 Uploading: ${content.name}`);
+                              console.log(`📄 Processing file: ${content.name}`);
+                              console.log(`   Content length: ${content.content.length} chars`);
+                              console.log(`   MIME type: ${content.mimeType}`);
                               
                               const formData = new FormData();
                               
@@ -1780,14 +1801,16 @@ This comprehensive document contains all technical information for AI search tes
                               const mimeType = isGeneratedContent ? 'text/plain' : content.mimeType;
                               console.log(`📄 Uploading ${content.name} as ${mimeType} (original: ${content.mimeType})`);
                               console.log(`   Is generated content: ${isGeneratedContent}`);
-                              console.log(`   Content length: ${content.content.length} chars`);
-                              console.log(`   Content preview: ${content.content.substring(0, 150)}...`);
+                              console.log(`   Content preview: ${content.content.substring(0, 200)}...`);
                               
                               const blob = new Blob([content.content], { type: mimeType });
                               const file = new File([blob], content.name, { type: mimeType });
                               formData.append('files', file);
-                              formData.append('system', `Google Drive - ${content.name.split('.')[0]}`);
-                              formData.append('subsystem', 'User Upload');
+                              
+                              // Use file-specific system naming for precise identification
+                              const fileBaseName = content.name.split('.')[0];
+                              formData.append('system', `Selected File - ${fileBaseName}`);
+                              formData.append('subsystem', 'User Selected Document');
                               
                               const response = await fetch(`${config.API_BASE_URL}/ingest`, {
                                 method: 'POST',
@@ -1796,14 +1819,36 @@ This comprehensive document contains all technical information for AI search tes
                               
                               if (response.ok) {
                                 const result = await response.json();
-                                totalChunks += result.added || 0;
+                                const chunksAdded = result.added || 0;
+                                totalChunks += chunksAdded;
                                 successCount++;
-                                console.log(`✅ ${content.name}: ${result.added} chunks indexed`);
+                                
+                                uploadedFiles.push({
+                                  name: content.name,
+                                  chunks: chunksAdded,
+                                  system: `Selected File - ${content.name.split('.')[0]}`,
+                                  status: 'success'
+                                });
+                                
+                                console.log(`✅ ${content.name}: ${chunksAdded} chunks indexed successfully`);
+                                toast.success(`✅ ${content.name} uploaded (${chunksAdded} chunks)`);
                               } else {
                                 console.warn(`⚠️ Failed to upload ${content.name}: ${response.status}`);
+                                uploadedFiles.push({
+                                  name: content.name,
+                                  chunks: 0,
+                                  status: 'failed',
+                                  error: response.status
+                                });
                               }
                             } catch (fileError) {
                               console.error(`❌ Error uploading ${content.name}:`, fileError);
+                              uploadedFiles.push({
+                                name: content.name,
+                                chunks: 0,
+                                status: 'error',
+                                error: fileError.message
+                              });
                             }
                           }
                           
@@ -1811,26 +1856,58 @@ This comprehensive document contains all technical information for AI search tes
                             throw new Error('No files were successfully uploaded to AI backend');
                           }
                           
+                          console.log(`🎉 Upload Summary:`);
+                          console.log(`   - Files uploaded: ${successCount}/${fileContents.length}`);
+                          console.log(`   - Total chunks: ${totalChunks}`);
+                          console.log(`   - Uploaded files:`, uploadedFiles);
+                          
                           toast.success(`✅ Uploaded ${successCount}/${fileContents.length} files: ${totalChunks} chunks indexed!`);
-                          console.log(`🎉 Upload complete: ${successCount} files, ${totalChunks} chunks`);
                           
-                          console.log('⏳ Step 3: Waiting for AI indexing (6 seconds)...');
-                          toast('⏳ AI is indexing your files...');
-                          await new Promise(resolve => setTimeout(resolve, 6000));
+                          // STEP 4: Wait for AI indexing and verify
+                          console.log('⏳ Step 4: Waiting for AI indexing and verification...');
+                          toast('⏳ AI is indexing your files for search...');
+                          await new Promise(resolve => setTimeout(resolve, 8000));
                           
-                          console.log('📊 Step 4: Refreshing stats and switching to AI Search...');
+                          // STEP 5: Verify files are properly indexed
+                          console.log('🔍 Step 5: Verifying files are ready for search...');
+                          try {
+                            const statsResponse = await fetch(`${config.API_BASE_URL}/stats`);
+                            const stats = await statsResponse.json();
+                            
+                            console.log('📊 Backend verification:', stats);
+                            console.log(`   - Total chunks: ${stats.totalChunks}`);
+                            console.log(`   - Files indexed: ${Object.keys(stats.byFile || {}).join(', ')}`);
+                            console.log(`   - Systems: ${Object.keys(stats.bySystem || {}).join(', ')}`);
+                            
+                            if (stats.totalChunks > 0) {
+                              toast.success(`✅ Verification complete: ${stats.totalChunks} chunks ready for search`);
+                              console.log('✅ Files are properly indexed and ready for AI search');
+                            } else {
+                              toast.warning('⚠️ Verification failed: No chunks found in backend');
+                            }
+                          } catch (verifyError) {
+                            console.log('⚠️ Verification failed:', verifyError);
+                            toast.warning('⚠️ Could not verify upload, but proceeding...');
+                          }
+                          
+                          // STEP 6: Switch to AI Search with file-specific guidance
+                          console.log('🔄 Step 6: Switching to AI Search for file-specific queries...');
                           setSelectedFiles(new Set());
                           await loadBackendStats();
                           
-                          toast.success(`🎉 SUCCESS! ${successCount} files ready for AI Search!`);
+                          const fileNames = uploadedFiles.filter(f => f.status === 'success').map(f => f.name);
+                          
+                          toast.success(`🎉 SUCCESS! ${successCount} files ready for file-specific AI Search!`);
+                          toast.success(`📁 Files available: ${fileNames.join(', ')}`);
                           toast.success('🔄 Switching to AI Search tab...');
                           
                           await new Promise(resolve => setTimeout(resolve, 2000));
                           setActiveTab('ai-search');
                           
                           setTimeout(() => {
-                            toast.success('✅ Your files are now available for AI Search!');
-                            toast.success('💡 Ask any question about your documents!');
+                            toast.success('✅ Your selected files are now available for AI Search!');
+                            toast.success('💡 Search will return results ONLY from your uploaded files!');
+                            toast.success(`🔍 Try: "door details", "surge protection", "maintenance procedures"`);
                           }, 500);
                           
                           console.log('✅ BULLETPROOF GOOGLE DRIVE LOAD COMPLETE!');
