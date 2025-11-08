@@ -59,7 +59,7 @@ const CHUNK_SIZE = 1500;           // Increased for better context
 const CHUNK_OVERLAP = 300;         // Increased overlap for continuity
 const MAX_SNIPPETS = 15;           // More snippets for comprehensive answers
 const MAX_EMBED_TEXT = 8000;       // Increased limit for Gemini
-const SIMILARITY_THRESHOLD = 0.7;  // Minimum similarity for results
+const SIMILARITY_THRESHOLD = 0.3;  // Lowered threshold for better results
 
 // Document type handlers
 const DOCUMENT_HANDLERS = {

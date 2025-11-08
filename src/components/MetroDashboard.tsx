@@ -650,7 +650,7 @@ The AI will search through your documents and provide intelligent answers.`,
     }
   };
 
-  // INTELLIGENT AI SEARCH WITH FALLBACK STRATEGIES
+  // SIMPLIFIED AND EFFECTIVE AI SEARCH
   const handleSearch = async () => {
     console.log('🔥 AI SEARCH STARTED!');
     
@@ -664,18 +664,92 @@ The AI will search through your documents and provide intelligent answers.`,
     try {
       console.log('🔍 Searching for:', searchQuery);
       
-      // Try multiple search strategies to get results
-      let searchResult = null;
-      let searchAttempts = [];
-      
-      // Strategy 1: Original query with k=5
-      console.log('📊 Strategy 1: Original query with k=5');
+      // Check if backend has any files first
+      let backendStats = null;
       try {
-        const response1 = await fetch(`${config.API_BASE_URL}/ask`, {
+        const statsResponse = await fetch(`${config.API_BASE_URL}/stats`);
+        backendStats = await statsResponse.json();
+        console.log('📊 Backend stats:', backendStats);
+      } catch (e) {
+        console.log('❌ Could not check backend stats:', e.message);
+      }
+      
+      // If no files uploaded, show upload instructions
+      if (!backendStats || backendStats.totalChunks === 0) {
+        console.log('📁 No files uploaded - showing upload instructions');
+        const noFilesResult: SearchResult = {
+          id: 'no_files_uploaded',
+          title: '📁 No Files Uploaded Yet',
+          content: `No files have been uploaded to the AI system yet. To get search results, you need to upload your documents first.
+
+**📋 How to Upload Files:**
+1. Go to the **Google Drive** tab above
+2. Connect to your Google Drive account  
+3. Select the files you want to search (B8 Service Checklist, Surge documents, etc.)
+4. Click **"🚀 LOAD SELECTED FILES FOR AI SEARCH"**
+5. Wait for the upload to complete
+6. Come back to this **AI Search** tab
+7. Search for your specific information
+
+**📝 Example Searches After Upload:**
+- **"What are the door system details?"** (for B8 Service Checklist)
+- **"What are the surge protection procedures?"** (for Surge documents)  
+- **"What are the DCU failure troubleshooting steps?"**
+- **"What are the maintenance procedures?"**
+
+**💡 Pro Tip:**
+The AI search works best with complete questions starting with "What are..." or "What is..."`,
+          system: 'Upload Required',
+          subsystem: 'No Files',
+          score: 1.0,
+          fileType: 'Instruction',
+          preview: 'Upload your files first to enable AI search',
+          sources: []
+        };
+        
+        setResults([noFilesResult]);
+        setActiveTab('results');
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Try direct search with improved query
+      let searchResult = null;
+      let finalQuery = searchQuery;
+      
+      // Convert simple queries to complete questions for better results
+      const lowerQuery = searchQuery.toLowerCase();
+      if (!lowerQuery.startsWith('what') && !lowerQuery.startsWith('how') && !lowerQuery.startsWith('describe')) {
+        if (lowerQuery.includes('door') && (lowerQuery.includes('detail') || lowerQuery.includes('system'))) {
+          finalQuery = 'What are the door system details and specifications?';
+        } else if (lowerQuery.includes('door') && lowerQuery.includes('troubleshoot')) {
+          finalQuery = 'What are the door troubleshooting procedures?';
+        } else if (lowerQuery.includes('dcu') && lowerQuery.includes('failure')) {
+          finalQuery = 'What are the DCU failure troubleshooting procedures?';
+        } else if (lowerQuery.includes('surge')) {
+          finalQuery = 'What are the surge protection system details?';
+        } else if (lowerQuery.includes('maintenance')) {
+          finalQuery = 'What are the maintenance procedures?';
+        } else if (lowerQuery.includes('b8') && lowerQuery.includes('service')) {
+          finalQuery = 'What are the B8 service checklist procedures?';
+        } else {
+          // Create a generic question format
+          const keywords = searchQuery.split(' ').filter(word => word.length > 2);
+          if (keywords.length > 0) {
+            finalQuery = `What are the ${keywords.slice(0, 2).join(' ')} details?`;
+          }
+        }
+      }
+      
+      console.log(`🔍 Final query: "${finalQuery}"`);
+      
+      // Perform the search
+      try {
+        const response = await fetch(`${config.API_BASE_URL}/ask`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            query: searchQuery,
+            query: finalQuery,
             k: 5,
             system: '',
             subsystem: '',
@@ -683,196 +757,33 @@ The AI will search through your documents and provide intelligent answers.`,
           })
         });
         
-        const data1 = await response1.json();
-        searchAttempts.push({ strategy: 'Original k=5', result: data1 });
+        const data = await response.json();
+        console.log('📊 Search response:', data);
         
-        if (data1.result && !data1.result.includes('No relevant documents found') && data1.sources?.length > 0) {
-          searchResult = data1;
-          console.log('✅ Strategy 1 SUCCESS');
+        if (data.result && !data.result.includes('No relevant documents found') && data.sources?.length > 0) {
+          searchResult = data;
+          console.log('✅ Search SUCCESS');
+        } else {
+          console.log('❌ Search returned no results');
         }
       } catch (e) {
-        console.log('❌ Strategy 1 failed:', e.message);
+        console.log('❌ Search failed:', e.message);
       }
       
-      // Strategy 2: If no results, try with k=3
-      if (!searchResult) {
-        console.log('📊 Strategy 2: Trying with k=3');
-        try {
-          const response2 = await fetch(`${config.API_BASE_URL}/ask`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: searchQuery,
-              k: 3,
-              system: '',
-              subsystem: '',
-              tags: []
-            })
-          });
-          
-          const data2 = await response2.json();
-          searchAttempts.push({ strategy: 'k=3', result: data2 });
-          
-          if (data2.result && !data2.result.includes('No relevant documents found') && data2.sources?.length > 0) {
-            searchResult = data2;
-            console.log('✅ Strategy 2 SUCCESS');
-          }
-        } catch (e) {
-          console.log('❌ Strategy 2 failed:', e.message);
-        }
-      }
       
-      // Strategy 3: Convert to "What is..." format (backend prefers complete questions)
-      if (!searchResult) {
-        console.log('📊 Strategy 3: Converting to "What is..." format');
-        
-        let questionQuery = '';
-        const lowerQuery = searchQuery.toLowerCase();
-        
-        // Convert common patterns to questions that work with the backend
-        if (lowerQuery.includes('door') && (lowerQuery.includes('detail') || lowerQuery.includes('system') || lowerQuery.includes('specification'))) {
-          questionQuery = 'What are the door system details and specifications?';
-        } else if (lowerQuery.includes('door') && (lowerQuery.includes('troubleshoot') || lowerQuery.includes('problem') || lowerQuery.includes('issue'))) {
-          questionQuery = 'What are the door troubleshooting procedures?';
-        } else if (lowerQuery.includes('dcu') && (lowerQuery.includes('failure') || lowerQuery.includes('fault') || lowerQuery.includes('error'))) {
-          questionQuery = 'What are the DCU failure troubleshooting procedures?';
-        } else if (lowerQuery.includes('door') && lowerQuery.includes('operation')) {
-          questionQuery = 'What are the door operation procedures?';
-        } else if (lowerQuery.includes('surge') && (lowerQuery.includes('detail') || lowerQuery.includes('system') || lowerQuery.includes('protection'))) {
-          questionQuery = 'What are the surge protection system details?';
-        } else if (lowerQuery.includes('surge') && (lowerQuery.includes('troubleshoot') || lowerQuery.includes('problem'))) {
-          questionQuery = 'What are the surge troubleshooting procedures?';
-        } else if (lowerQuery.includes('b8') && (lowerQuery.includes('service') || lowerQuery.includes('checklist') || lowerQuery.includes('procedure'))) {
-          questionQuery = 'What are the B8 service checklist procedures?';
-        } else if (lowerQuery.includes('maintenance') && (lowerQuery.includes('procedure') || lowerQuery.includes('checklist'))) {
-          questionQuery = 'What are the maintenance procedures?';
-        } else if (lowerQuery.includes('voltage')) {
-          questionQuery = 'What is the operating voltage?';
-        } else if (lowerQuery.includes('safety') || lowerQuery.includes('emergency')) {
-          questionQuery = 'What are the safety systems?';
-        } else if (lowerQuery.includes('specification') || lowerQuery.includes('technical')) {
-          questionQuery = 'What are the technical specifications?';
-        } else if (lowerQuery.includes('control') || lowerQuery.includes('system')) {
-          questionQuery = 'What are the control systems?';
-        } else if (lowerQuery.includes('electrical') || lowerQuery.includes('power')) {
-          questionQuery = 'What are the electrical specifications?';
-        } else if (lowerQuery.includes('traction') || lowerQuery.includes('motor')) {
-          questionQuery = 'What is the traction system?';
-        } else if (lowerQuery.includes('brake') || lowerQuery.includes('braking')) {
-          questionQuery = 'What is the braking system?';
-        } else if (lowerQuery.includes('signal') || lowerQuery.includes('cbtc')) {
-          questionQuery = 'What is the signaling system?';
-        } else if (lowerQuery.includes('failure') || lowerQuery.includes('fault') || lowerQuery.includes('error')) {
-          questionQuery = 'What are the failure modes and troubleshooting procedures?';
-        } else if (lowerQuery.includes('dcu')) {
-          questionQuery = 'What is the DCU system and its failure modes?';
-        } else {
-          // Extract key words and create a question
-          const keyWords = searchQuery.toLowerCase()
-            .split(/\s+/)
-            .filter(word => word.length > 2)
-            .filter(word => !['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'she', 'use', 'way', 'what', 'when', 'with'].includes(word));
-          
-          if (keyWords.length > 0) {
-            questionQuery = `What is the ${keyWords.slice(0, 2).join(' ')}?`;
-          } else {
-            questionQuery = `What are the technical specifications?`;
-          }
-        }
-        
-        console.log('🔍 Question format query:', questionQuery);
-        
-        try {
-          const response3 = await fetch(`${config.API_BASE_URL}/ask`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: questionQuery,
-              k: 5,
-              system: '',
-              subsystem: '',
-              tags: []
-            })
-          });
-          
-          const data3 = await response3.json();
-          searchAttempts.push({ strategy: `Question format: "${questionQuery}"`, result: data3 });
-          
-          if (data3.result && !data3.result.includes('No relevant documents found') && data3.sources?.length > 0) {
-            searchResult = data3;
-            console.log('✅ Strategy 3 SUCCESS with question format');
-          }
-        } catch (e) {
-          console.log('❌ Strategy 3 failed:', e.message);
-        }
-      }
-      
-      // Strategy 4: Try generic technical specifications question
-      if (!searchResult) {
-        console.log('📊 Strategy 4: Trying generic technical question');
-        const genericQuery = 'What are the technical specifications?';
-        console.log('🔍 Generic query:', genericQuery);
-        
-        try {
-          const response4 = await fetch(`${config.API_BASE_URL}/ask`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: genericQuery,
-              k: 5,
-              system: '',
-              subsystem: '',
-              tags: []
-            })
-          });
-          
-          const data4 = await response4.json();
-          searchAttempts.push({ strategy: 'Generic technical specs', result: data4 });
-          
-          if (data4.result && !data4.result.includes('No relevant documents found') && data4.sources?.length > 0) {
-            searchResult = data4;
-            console.log('✅ Strategy 4 SUCCESS with generic question');
-          }
-        } catch (e) {
-          console.log('❌ Strategy 4 failed:', e.message);
-        }
-      }
-      
-      console.log('📊 All search attempts:', searchAttempts.map(a => ({ 
-        strategy: a.strategy, 
-        hasResult: !!a.result.result,
-        resultLength: a.result.result?.length || 0,
-        sources: a.result.sources?.length || 0
-      })));
-      
-      // Use the best result we found
-      const data = searchResult || searchAttempts[searchAttempts.length - 1]?.result;
-      
-      if (!data) {
-        throw new Error('All search strategies failed');
-      }
-      
-      console.log('📊 Final search response:', data);
-      console.log('📊 Response details:', {
-        hasResult: !!data.result,
-        resultLength: data.result?.length || 0,
-        sourcesCount: data.sources?.length || 0,
-        used: data.used || 0,
-        totalIndexed: data.totalIndexed || 0,
-        resultPreview: data.result?.substring(0, 100) || 'No result'
-      });
-      
-      // Create results array
+      // Process search results
       const searchResults: SearchResult[] = [];
       
-      // Check if we got a good result
-      if (searchResult && data.result && !data.result.includes('No relevant documents found')) {
+      if (searchResult && searchResult.result && !searchResult.result.includes('No relevant documents found')) {
+        // Success - we have results
+        console.log('✅ Search successful, processing results...');
+        
         // Clean HTML from result
-        const cleanResult = data.result.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n').trim();
+        const cleanResult = searchResult.result.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n').trim();
         
         searchResults.push({
           id: 'ai_response',
-          title: `🤖 AI Analysis${searchResult !== searchAttempts[0]?.result ? ' (Alternative Strategy)' : ''}`,
+          title: `🤖 AI Analysis`,
           content: cleanResult,
           system: 'AI Response',
           subsystem: 'Generated',
@@ -886,148 +797,93 @@ The AI will search through your documents and provide intelligent answers.`,
             preview: cleanResult.substring(0, 200)
           }]
         });
-      } else {
-        // No good results found with any strategy
-        console.log('⚠️ All search strategies failed to find relevant results');
         
-        // Check if backend has any files at all
-        let backendHasFiles = false;
-        try {
-          const statsResponse = await fetch(`${config.API_BASE_URL}/stats`);
-          const stats = await statsResponse.json();
-          backendHasFiles = stats.totalChunks > 0;
-          console.log('📊 Backend stats:', stats);
-        } catch (e) {
-          console.log('❌ Could not check backend stats:', e.message);
+        // Add source documents
+        if (searchResult.sources && searchResult.sources.length > 0) {
+          searchResult.sources.forEach((source: any, index: number) => {
+            searchResults.push({
+              id: `source_${index}`,
+              title: `📄 ${source.fileName}`,
+              content: source.preview || 'No preview available',
+              system: source.system || 'Unknown',
+              subsystem: source.subsystem || 'Unknown',
+              score: source.score || 0.5,
+              fileType: 'Document',
+              preview: (source.preview || 'No preview available').substring(0, 300),
+              sources: [{
+                fileName: source.fileName,
+                position: source.position || 0,
+                score: source.score || 0.5,
+                preview: source.preview || 'No preview available'
+              }]
+            });
+          });
         }
+      } else {
+        // No results found
+        console.log('❌ No results found, showing helpful message...');
         
         const noResultsMessage: SearchResult = {
-          id: 'intelligent_no_results',
-          title: backendHasFiles ? '🔍 No Results Found - Backend Algorithm Issue' : '📁 No Files Uploaded Yet',
-          content: backendHasFiles ? 
-            `I tried multiple intelligent search strategies for "${searchQuery}" but couldn't find relevant matches:
+          id: 'no_results',
+          title: '🔍 No Results Found',
+          content: `No results found for "${searchQuery}". This could be because:
 
-**Search Strategies Attempted:**
-${searchAttempts.map((attempt, index) => 
-  `${index + 1}. ${attempt.strategy}: ${attempt.result.sources?.length || 0} sources, ${attempt.result.result?.length || 0} chars`
-).join('\n')}
+**Possible Reasons:**
+1. **Query format**: Try using complete questions like "What are the door systems?"
+2. **Keywords**: Use specific technical terms from your documents
+3. **Content mismatch**: The search terms might not match your uploaded content
 
-**Backend Algorithm Behavior:**
-The backend search works best with complete questions starting with "What":
-- ✅ "What are the door system details?" → Works perfectly
-- ✅ "What are the technical specifications?" → Works perfectly  
-- ✅ "What are the DCU failure procedures?" → Works perfectly
-- ❌ "door details", "DCU failure", "safety" → May not work
-
-**Try These Working Query Formats:**
-- **"What are the door system details and specifications?"**
-- **"What are the DCU failure troubleshooting procedures?"**
-- **"What are the surge protection system details?"**
-- **"What are the B8 service checklist procedures?"**
-- **"What are the maintenance procedures?"**
-
-**For "${searchQuery}", try:**
-${searchQuery.toLowerCase().includes('door') ? '- "What are the door system details and specifications?"' :
-  searchQuery.toLowerCase().includes('surge') ? '- "What are the surge protection system details?"' :
-  searchQuery.toLowerCase().includes('dcu') ? '- "What are the DCU failure troubleshooting procedures?"' :
-  searchQuery.toLowerCase().includes('b8') ? '- "What are the B8 service checklist procedures?"' :
-  searchQuery.toLowerCase().includes('maintenance') ? '- "What are the maintenance procedures?"' :
-  searchQuery.toLowerCase().includes('safety') ? '- "What are the safety systems?"' :
-  searchQuery.toLowerCase().includes('voltage') ? '- "What is the operating voltage?"' :
-  '- "What are the technical specifications?"'}` :
-            `No files have been uploaded to the AI system yet. To get search results, you need to upload your documents first.
-
-**📋 How to Upload Files:**
-1. Go to the **Google Drive** tab above
-2. Connect to your Google Drive account
-3. Select the files you want to search (B8 Service Checklist, Surge documents, etc.)
-4. Click **"🚀 LOAD SELECTED FILES FOR AI SEARCH"**
-5. Wait for the upload to complete
-6. Come back to this **AI Search** tab
-7. Search for your specific information
-
-**📝 Example Searches After Upload:**
-- **"What are the door system details?"** (for B8 Service Checklist)
-- **"What are the surge protection procedures?"** (for Surge documents)
-- **"What are the DCU failure troubleshooting steps?"**
-- **"What are the maintenance procedures?"**
-
-**💡 Pro Tip:**
-The AI search works best with complete questions starting with "What are..." or "What is..."`
-${searchQuery.toLowerCase().includes('voltage') ? '- "What is the operating voltage?"' :
-  searchQuery.toLowerCase().includes('safety') ? '- "What are the safety systems?"' :
-  searchQuery.toLowerCase().includes('dcu') || searchQuery.toLowerCase().includes('failure') ? '- "What are the failure modes and troubleshooting procedures?"' :
-  searchQuery.toLowerCase().includes('control') ? '- "What is the control system?"' :
+**Suggested Query Formats:**
+${lowerQuery.includes('door') ? '- "What are the door system details and specifications?"' :
+  lowerQuery.includes('surge') ? '- "What are the surge protection system details?"' :
+  lowerQuery.includes('dcu') ? '- "What are the DCU failure troubleshooting procedures?"' :
+  lowerQuery.includes('maintenance') ? '- "What are the maintenance procedures?"' :
   '- "What are the technical specifications?"'}
 
-**Available documents:** ${data.totalIndexed || 0} chunks from ${backendStats?.totalFiles || 0} files
+**Files Available:** ${backendStats?.uniqueFiles || 0} files with ${backendStats?.totalChunks || 0} searchable chunks
 
-The backend search algorithm is very specific about query format. Use complete questions for best results.`,
-          system: 'Search Algorithm',
-          subsystem: 'Format Issue',
+Try rephrasing your query or use different keywords that might be in your documents.`,
+          system: 'Search Help',
+          subsystem: 'No Results',
           score: 0.5,
-          fileType: 'Backend Limitation',
-          preview: `Backend search algorithm requires complete questions. Try "What is the ${searchQuery}?" format.`,
+          fileType: 'Help Message',
+          preview: `No results for "${searchQuery}". Try different keywords or complete questions.`,
           sources: []
         };
         
         searchResults.push(noResultsMessage);
       }
       
-      // Add source documents
-      if (data.sources && data.sources.length > 0) {
-        data.sources.forEach((source: any, index: number) => {
-          searchResults.push({
-            id: `source_${index}`,
-            title: `📄 ${source.fileName}`,
-            content: source.preview || 'No preview available',
-            system: source.system || 'Unknown',
-            subsystem: source.subsystem || 'Unknown',
-            score: source.score || 0.5,
-            fileType: 'Document',
-            preview: (source.preview || 'No preview available').substring(0, 300),
-            sources: [{
-              fileName: source.fileName,
-              position: source.position || 0,
-              score: source.score || 0.5,
-              preview: source.preview || 'No preview available'
-            }]
-          });
-        });
-      }
       
-      console.log('✅ Created', searchResults.length, 'results');
-      
+      // Display results
       if (searchResults.length > 0) {
         setResults(searchResults);
         setActiveTab('results');
-        toast.success(`🎉 Found ${searchResults.length} results!`);
-        console.log('✅ Results displayed successfully');
+        
+        if (searchResult) {
+          toast.success(`🎉 Found results from your uploaded files!`);
+          console.log('✅ Search successful - results from uploaded files');
+        } else {
+          toast('🔍 No results found. Try different keywords or upload files.');
+          console.log('❌ No results found');
+        }
       } else {
-        // No results found
-        const noResults: SearchResult = {
-          id: 'no_results',
-          title: '🔍 No Results Found',
-          content: `No results found for "${searchQuery}".
-
-Try:
-- Different keywords
-- Simpler terms
-- Check if documents contain this information
-- Upload more documents
-
-Available: ${backendStats?.totalFiles || 0} files, ${backendStats?.totalChunks || 0} chunks`,
-          system: 'Search',
-          subsystem: 'No Results',
+        // Fallback - should not happen with new logic
+        const fallbackResult: SearchResult = {
+          id: 'fallback',
+          title: '🔍 Search Complete',
+          content: `Search completed for "${searchQuery}" but no results were generated. Please try different keywords or upload documents first.`,
+          system: 'Search System',
+          subsystem: 'Fallback',
           score: 0,
-          fileType: 'Message',
-          preview: `No results for "${searchQuery}". Try different keywords.`,
+          fileType: 'System Message',
+          preview: 'Search completed with no results',
           sources: []
         };
         
-        setResults([noResults]);
+        setResults([fallbackResult]);
         setActiveTab('results');
-        toast('🔍 No results found. Try different keywords.');
+        toast('🔍 Search completed. Try different keywords.');
       }
       
     } catch (error: any) {
@@ -1041,7 +897,27 @@ Available: ${backendStats?.totalFiles || 0} files, ${backendStats?.totalChunks |
         content: `Search failed: ${error.message}
 
 This might be because:
-1. No documents are uploaded yet
+1. **No documents uploaded**: Upload files via Google Drive tab first
+2. **Backend connection issue**: Check your internet connection
+3. **Server error**: The AI backend might be temporarily unavailable
+
+**To fix this:**
+1. Go to **Google Drive** tab
+2. Upload your documents
+3. Try searching again
+4. Use complete questions like "What are the door systems?"
+
+If the problem persists, try refreshing the page.`,
+        system: 'Error Handler',
+        subsystem: 'Search Error',
+        score: 0,
+        fileType: 'Error Message',
+        preview: `Search failed: ${error.message}`,
+        sources: []
+      };
+      
+      setResults([errorResult]);
+      setActiveTab('results');
 2. Backend connection issue
 3. Documents are still being indexed
 
