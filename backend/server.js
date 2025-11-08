@@ -327,6 +327,154 @@ RESPONSE FORMAT:
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
 }
 
+/* ------------------------------ Alternative JSON Ingest ------------------------------ */
+app.post("/ingest-json", async (req, res) => {
+  try {
+    const { content, fileName, system, subsystem, mimeType } = req.body;
+    
+    if (!content || !fileName) {
+      return res.status(400).json({ error: "Missing content or fileName" });
+    }
+
+    console.log(`🔄 Processing JSON upload: ${fileName}`);
+
+    let added = 0;
+    const processingResults = [];
+
+    try {
+      const rawText = content;
+      const metadata = { 
+        contentType: 'json_upload',
+        source: 'frontend_json',
+        originalMime: mimeType || 'text/plain',
+        detectedAsText: true,
+        originalLength: content.length
+      };
+
+      if (!rawText || rawText.trim().length < 10) {
+        console.warn(`Skipping ${fileName}: insufficient content (${rawText.length} chars)`);
+        return res.json({
+          ok: true,
+          added: 0,
+          total: VECTOR_STORE.length,
+          results: [{
+            fileName,
+            status: 'skipped',
+            reason: 'insufficient_content',
+            contentLength: rawText.length
+          }]
+        });
+      }
+
+      console.log(`✅ Processing ${rawText.length} characters from ${fileName}`);
+
+      // Enhanced chunking
+      const chunks = enhancedChunkText(rawText, CHUNK_SIZE, CHUNK_OVERLAP);
+      console.log(`📊 Created ${chunks.length} chunks for ${fileName}`);
+
+      let chunksAdded = 0;
+
+      // Process each chunk with enhanced error handling
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        console.log(`🔄 Processing chunk ${i + 1}/${chunks.length} for ${fileName} (${chunk.length} chars)`);
+
+        try {
+          let embedding;
+          try {
+            embedding = await geminiEmbed(chunk);
+            
+            if (embedding.length === 0) {
+              console.warn(`⚠️ Empty embedding for chunk ${i} of ${fileName}`);
+              continue;
+            }
+          } catch (embeddingError) {
+            console.error(`❌ Embedding error for chunk ${i} of ${fileName}:`, embeddingError.message);
+            
+            // Check if it's an API key issue
+            if (embeddingError.message.includes('API key not valid') || embeddingError.message.includes('GEMINI_API_KEY missing')) {
+              console.log('⚠️ Gemini API key issue detected - file processed but search will not work');
+              // Continue processing but skip embedding
+              continue;
+            }
+            
+            // For other errors, continue to next chunk
+            continue;
+          }
+
+          const vectorItem = {
+            id: NEXT_ID++,
+            fileName,
+            mime: mimeType || 'text/plain',
+            system: system || "",
+            subsystem: subsystem || "",
+            meta: {
+              ...metadata,
+              chunkIndex: i,
+              totalChunks: chunks.length,
+              chunkSize: chunk.length,
+              processingTimestamp: new Date().toISOString()
+            },
+            chunk,
+            embedding,
+            sourceId: fileName,
+            position: i,
+            timestamp: new Date().toISOString(),
+            tags: extractTags(chunk)
+          };
+
+          VECTOR_STORE.push(vectorItem);
+          added++;
+          chunksAdded++;
+          
+          console.log(`✅ Added chunk ${i + 1} to vector store (ID: ${vectorItem.id})`);
+        } catch (chunkError) {
+          console.error(`❌ Chunk processing error for chunk ${i} of ${fileName}:`, chunkError.message);
+        }
+      }
+
+      processingResults.push({
+        fileName,
+        status: 'success',
+        chunks: chunks.length,
+        addedToStore: chunksAdded,
+        contentLength: rawText.length,
+        system: system || "",
+        subsystem: subsystem || "",
+        metadata
+      });
+
+      console.log(`🎉 Successfully processed ${fileName}: ${chunksAdded}/${chunks.length} chunks added`);
+
+    } catch (fileError) {
+      console.error(`❌ File processing error for ${fileName}:`, fileError);
+      processingResults.push({
+        fileName,
+        status: 'error',
+        error: fileError.message
+      });
+    }
+
+    console.log(`🏁 JSON ingestion complete: ${added} chunks added, ${VECTOR_STORE.length} total chunks`);
+
+    res.json({
+      ok: true,
+      added,
+      total: VECTOR_STORE.length,
+      results: processingResults,
+      summary: {
+        filesProcessed: processingResults.length,
+        chunksAdded: added,
+        totalChunks: VECTOR_STORE.length
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ /ingest-json error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ------------------------------ Enhanced Indexing (Ingest) ------------------------------ */
 app.post("/ingest", upload.array("files"), async (req, res) => {
   try {

@@ -236,7 +236,14 @@ export default function SimpleAISearch() {
       // Step 3: Upload to AI backend with enhanced processing
       setProcessingProgress('Uploading to AI backend...');
       console.log('📤 Uploading to AI backend...');
-      const formData = new FormData();
+      
+      let formData;
+      try {
+        formData = new FormData();
+      } catch (formError) {
+        console.error('❌ FormData creation failed:', formError);
+        throw new Error('Failed to create form data for upload');
+      }
       
       // Create enhanced content with metadata
       const enhancedContent = `DOCUMENT INFORMATION:
@@ -252,12 +259,54 @@ ${content.content}
 KEYWORDS: ${extractKeywords(content.content)}
 SUGGESTED QUERIES: ${generateSuggestedQueries(content.content, file.name)}`;
 
-      const blob = new Blob([enhancedContent], { type: 'text/plain' });
-      const uploadFile = new File([blob], file.name, { type: 'text/plain' });
+      let blob;
+      try {
+        blob = new Blob([enhancedContent], { type: 'text/plain' });
+        console.log('✅ Blob created successfully:', blob.size, 'bytes');
+      } catch (blobError) {
+        console.error('❌ Blob creation failed:', blobError);
+        throw new Error('Failed to create file blob for upload');
+      }
       
-      formData.append('files', uploadFile);
-      formData.append('system', `Selected File - ${file.name.split('.')[0]}`);
-      formData.append('subsystem', 'Google Drive Upload');
+      try {
+        // Use blob directly instead of File constructor for better compatibility
+        formData.append('files', blob, file.name);
+        formData.append('system', `Selected File - ${file.name.split('.')[0]}`);
+        formData.append('subsystem', 'Google Drive Upload');
+        console.log('✅ File appended to form data:', file.name);
+      } catch (appendError) {
+        console.error('❌ FormData append failed:', appendError);
+        
+        // Try alternative upload method
+        console.log('🔄 Trying alternative upload method...');
+        const alternativeSuccess = await uploadFileAlternative(enhancedContent, file.name);
+        
+        if (alternativeSuccess) {
+          console.log('✅ Alternative upload successful, continuing...');
+          // Skip to the verification step
+          setProcessingProgress('Indexing content for AI search...');
+          console.log('⏳ Waiting for indexing...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+
+          // Step 5: Verify file is ready
+          setProcessingProgress('Verifying indexing...');
+          const statsResponse = await fetch(`${config.API_BASE_URL}/stats`);
+          const stats = await statsResponse.json();
+          setBackendStats(stats);
+          
+          if (stats.totalChunks > 0) {
+            setIsFileReady(true);
+            setProcessingProgress('Ready for search!');
+            toast.success(`✅ ${file.name} is ready for AI search!`);
+            toast.success(`📊 Content indexed successfully`);
+          } else {
+            throw new Error('File was not properly indexed');
+          }
+          return; // Exit early since alternative method worked
+        } else {
+          throw new Error('Both upload methods failed. Please try again.');
+        }
+      }
 
       const uploadResponse = await fetch(`${config.API_BASE_URL}/ingest`, {
         method: 'POST',
@@ -538,6 +587,41 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
     }
 
     return suggestions.slice(0, 6);
+  };
+
+  // Alternative upload method using JSON instead of FormData
+  const uploadFileAlternative = async (content: string, fileName: string): Promise<boolean> => {
+    try {
+      console.log('🔄 Using alternative JSON upload method...');
+      
+      const uploadData = {
+        content: content,
+        fileName: fileName,
+        system: `Selected File - ${fileName.split('.')[0]}`,
+        subsystem: 'Google Drive Upload',
+        mimeType: 'text/plain'
+      };
+
+      const response = await fetch(`${config.API_BASE_URL}/ingest-json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(uploadData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Alternative upload successful:', result);
+        return true;
+      } else {
+        console.log('⚠️ Alternative upload endpoint not available');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Alternative upload failed:', error);
+      return false;
+    }
   };
 
   return (
