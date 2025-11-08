@@ -919,10 +919,6 @@ If the problem persists, try refreshing the page.`,
       
       setResults([errorResult]);
       setActiveTab('results');
-2. Backend connection issue
-3. Documents are still being indexed
-
-Try uploading documents first using the Google Drive tab.`,
         system: 'Error',
         subsystem: 'Search Failed',
         score: 0,

@@ -342,72 +342,71 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
       const system = req.body.system || "";
       const subsystem = req.body.subsystem || "";
 
-      console.log(`Processing: ${fileName} (${mimetype})`);
+      console.log(`🔄 Processing: ${fileName} (${mimetype})`);
+      console.log(`📁 System: ${system}, Subsystem: ${subsystem}`);
 
       try {
         let rawText = "";
         let metadata = {};
 
-        // Check if the uploaded file is actually text content (from frontend)
+        // Enhanced content detection for Google Drive files
         let fileContent;
         try {
           fileContent = fs.readFileSync(filePath, 'utf8');
           console.log(`📄 Read file content: ${fileContent.length} chars`);
-          console.log(`📄 Content preview: "${fileContent.substring(0, 100)}..."`);
         } catch (e) {
           console.log(`❌ Error reading file as text: ${e.message}`);
           fileContent = '';
         }
         
-        // Detect if this is text content uploaded from frontend (not a real binary file)
-        const hasDocInfo = fileContent.includes('DOCUMENT INFORMATION:');
-        const hasSearchableContent = fileContent.includes('SEARCHABLE CONTENT:');
-        const hasDoorSystems = fileContent.includes('DOOR SYSTEMS');
-        const hasB8Service = fileContent.includes('B8 Service');
-        const hasKeywords = fileContent.includes('KEYWORDS:');
-        const hasSuggestedQueries = fileContent.includes('SUGGESTED QUERIES:');
-        const hasDCUFailure = fileContent.includes('DCU FAILURE');
-        const hasDoorWidth = fileContent.includes('Door width');
-        const has110VDC = fileContent.includes('110V DC');
-        const isReadableText = fileContent.length > 50 && 
-                              fileContent.split('\n').length > 3 &&
-                              !/[\x00-\x08\x0E-\x1F\x7F-\xFF]/.test(fileContent.substring(0, 200));
+        // Enhanced detection patterns for Google Drive content
+        const detectionPatterns = {
+          hasDocInfo: fileContent.includes('DOCUMENT INFORMATION:'),
+          hasSearchableContent: fileContent.includes('SEARCHABLE CONTENT:'),
+          hasKeywords: fileContent.includes('KEYWORDS:'),
+          hasSuggestedQueries: fileContent.includes('SUGGESTED QUERIES:'),
+          hasMetadata: fileContent.includes('File Name:') && fileContent.includes('File Type:'),
+          isStructuredText: fileContent.split('\n').length > 5 && fileContent.length > 100,
+          hasReadableContent: !/[\x00-\x08\x0E-\x1F\x7F-\xFF]/.test(fileContent.substring(0, 500)),
+          isPlainText: mimetype === 'text/plain' || mimetype.startsWith('text/'),
+          isGoogleDriveContent: system.includes('Selected File') || subsystem.includes('Google Drive')
+        };
 
-        console.log(`🔍 Content detection checks:`);
-        console.log(`   - Has DOCUMENT INFORMATION: ${hasDocInfo}`);
-        console.log(`   - Has SEARCHABLE CONTENT: ${hasSearchableContent}`);
-        console.log(`   - Has DOOR SYSTEMS: ${hasDoorSystems}`);
-        console.log(`   - Has B8 Service: ${hasB8Service}`);
-        console.log(`   - Has KEYWORDS: ${hasKeywords}`);
-        console.log(`   - Has SUGGESTED QUERIES: ${hasSuggestedQueries}`);
-        console.log(`   - Has DCU FAILURE: ${hasDCUFailure}`);
-        console.log(`   - Has Door width: ${hasDoorWidth}`);
-        console.log(`   - Has 110V DC: ${has110VDC}`);
-        console.log(`   - Is readable text: ${isReadableText}`);
+        console.log(`🔍 Enhanced content detection:`, detectionPatterns);
 
-        const isTextContent = hasDocInfo || hasSearchableContent || hasDoorSystems || hasB8Service || 
-                             hasKeywords || hasSuggestedQueries || hasDCUFailure || hasDoorWidth || 
-                             has110VDC || isReadableText;
+        const isEnhancedTextContent = detectionPatterns.hasDocInfo || 
+                                     detectionPatterns.hasSearchableContent || 
+                                     detectionPatterns.hasKeywords ||
+                                     (detectionPatterns.isGoogleDriveContent && detectionPatterns.isStructuredText);
 
-        console.log(`🎯 Final decision: isTextContent = ${isTextContent}`);
-        
-        if (isTextContent) {
-          console.log(`✅ Detected text content from frontend for ${fileName} (${fileContent.length} chars)`);
-          console.log(`   Content preview: ${fileContent.substring(0, 200)}...`);
-          console.log(`   Content contains door info: ${fileContent.includes('Door width') || fileContent.includes('DCU')}`);
+        if (isEnhancedTextContent || (detectionPatterns.isPlainText && detectionPatterns.hasReadableContent)) {
+          console.log(`✅ Processing as enhanced text content from Google Drive`);
           rawText = fileContent;
+          
+          // Extract structured content if available
+          if (detectionPatterns.hasSearchableContent) {
+            const searchableStart = fileContent.indexOf('SEARCHABLE CONTENT:');
+            if (searchableStart !== -1) {
+              const keywordsStart = fileContent.indexOf('KEYWORDS:', searchableStart);
+              if (keywordsStart !== -1) {
+                rawText = fileContent.substring(searchableStart + 'SEARCHABLE CONTENT:'.length, keywordsStart).trim();
+              } else {
+                rawText = fileContent.substring(searchableStart + 'SEARCHABLE CONTENT:'.length).trim();
+              }
+            }
+          }
+          
           metadata = { 
-            contentType: 'frontend_text',
-            source: 'frontend_upload',
+            contentType: 'google_drive_text',
+            source: 'google_drive_upload',
             originalMime: mimetype,
-            detectedAsText: true,
-            originalLength: fileContent.length
+            detectedAsEnhanced: true,
+            originalLength: fileContent.length,
+            extractedLength: rawText.length,
+            hasStructuredData: detectionPatterns.hasDocInfo
           };
         } else {
-          console.log(`📄 Processing as binary file: ${fileName} (${mimetype})`);
-          console.log(`   File content length: ${fileContent.length}`);
-          console.log(`   File content preview: ${fileContent.substring(0, 100)}...`);
-          // Use enhanced extraction for actual binary files
+          console.log(`📄 Processing as binary file using extraction: ${fileName}`);
           const extractionResult = await enhancedExtractText(filePath, mimetype, fileName);
           rawText = extractionResult.text;
           metadata = extractionResult.metadata;
@@ -416,8 +415,8 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
         // Cleanup temp file
         fs.unlink(filePath, () => { });
 
-        if (!rawText || rawText.trim().length < 10) {
-          console.warn(`Skipping ${fileName}: insufficient content (${rawText.length} chars)`);
+        if (!rawText || rawText.trim().length < 20) {
+          console.warn(`⚠️ Skipping ${fileName}: insufficient content (${rawText.length} chars)`);
           processingResults.push({
             fileName,
             status: 'skipped',
@@ -429,20 +428,22 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
 
         console.log(`✅ Extracted ${rawText.length} characters from ${fileName}`);
 
-        // Enhanced chunking
-        const chunks = enhancedChunkText(rawText);
-        console.log(`Created ${chunks.length} chunks for ${fileName}`);
+        // Enhanced chunking with better overlap
+        const chunks = enhancedChunkText(rawText, CHUNK_SIZE, CHUNK_OVERLAP);
+        console.log(`📊 Created ${chunks.length} chunks for ${fileName}`);
 
-        // Process each chunk
+        let chunksAdded = 0;
+
+        // Process each chunk with enhanced error handling
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          console.log(`Processing chunk ${i + 1}/${chunks.length} for ${fileName} (${chunk.length} chars)`);
+          console.log(`🔄 Processing chunk ${i + 1}/${chunks.length} for ${fileName} (${chunk.length} chars)`);
 
           try {
             const embedding = await geminiEmbed(chunk);
 
             if (embedding.length === 0) {
-              console.warn(`Empty embedding for chunk ${i} of ${fileName}`);
+              console.warn(`⚠️ Empty embedding for chunk ${i} of ${fileName}`);
               continue;
             }
 
@@ -456,7 +457,8 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
                 ...metadata,
                 chunkIndex: i,
                 totalChunks: chunks.length,
-                chunkSize: chunk.length
+                chunkSize: chunk.length,
+                processingTimestamp: new Date().toISOString()
               },
               chunk,
               embedding,
@@ -468,10 +470,11 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
 
             VECTOR_STORE.push(vectorItem);
             added++;
+            chunksAdded++;
             
             console.log(`✅ Added chunk ${i + 1} to vector store (ID: ${vectorItem.id})`);
           } catch (embeddingError) {
-            console.error(`Embedding error for chunk ${i} of ${fileName}:`, embeddingError.message);
+            console.error(`❌ Embedding error for chunk ${i} of ${fileName}:`, embeddingError.message);
           }
         }
 
@@ -479,15 +482,17 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
           fileName,
           status: 'success',
           chunks: chunks.length,
-          addedToStore: chunks.length,
+          addedToStore: chunksAdded,
           contentLength: rawText.length,
           system,
           subsystem,
           metadata
         });
 
+        console.log(`🎉 Successfully processed ${fileName}: ${chunksAdded}/${chunks.length} chunks added`);
+
       } catch (fileError) {
-        console.error(`File processing error for ${fileName}:`, fileError);
+        console.error(`❌ File processing error for ${fileName}:`, fileError);
         processingResults.push({
           fileName,
           status: 'error',
@@ -499,11 +504,18 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
       }
     }
 
+    console.log(`🏁 Ingestion complete: ${added} chunks added, ${VECTOR_STORE.length} total chunks`);
+
     res.json({
       ok: true,
       added,
       total: VECTOR_STORE.length,
-      results: processingResults
+      results: processingResults,
+      summary: {
+        filesProcessed: processingResults.length,
+        chunksAdded: added,
+        totalChunks: VECTOR_STORE.length
+      }
     });
 
   } catch (err) {

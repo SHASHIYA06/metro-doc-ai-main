@@ -37,10 +37,29 @@ export interface SearchResult {
 
 class GoogleDriveService {
     private baseURL: string;
+    private isInitialized: boolean = false;
 
     constructor() {
         this.baseURL = config.APP_SCRIPT_URL;
         console.log('GoogleDriveService initialized with URL:', this.baseURL);
+    }
+
+    // Initialize the service
+    async initialize(): Promise<void> {
+        if (this.isInitialized) return;
+        
+        try {
+            console.log('🔧 Initializing Google Drive service...');
+            const isConnected = await this.testConnection();
+            if (!isConnected) {
+                throw new Error('Failed to connect to Google Apps Script');
+            }
+            this.isInitialized = true;
+            console.log('✅ Google Drive service initialized successfully');
+        } catch (error) {
+            console.error('❌ Failed to initialize Google Drive service:', error);
+            throw error;
+        }
     }
 
     // Helper function to escape HTML (from working HTML)
