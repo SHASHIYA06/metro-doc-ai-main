@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Upload, FileText, Loader2, CheckCircle, AlertCircle, FolderOpen, File, RefreshCw, Download, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { googleDriveService } from '../services/googleDrive_new';
+import { googleDriveServiceFixed as googleDriveService } from '../services/googleDriveFixed';
 
 interface DriveFile {
   id: string;
@@ -211,15 +211,24 @@ export default function SimpleAISearch() {
 
       // Step 2: Extract file content with progress
       setProcessingProgress('Extracting file content...');
-      console.log('📥 Extracting file content...');
-      const fileContents = await googleDriveService.extractFileContents([file.id]);
+      console.log('📥 Extracting file content from:', file.name, 'ID:', file.id);
+      
+      let fileContents;
+      try {
+        fileContents = await googleDriveService.extractFileContents([file.id]);
+        console.log('📥 File extraction result:', fileContents);
+      } catch (extractError) {
+        console.error('❌ File extraction failed:', extractError);
+        throw new Error(`Failed to extract content from ${file.name}: ${extractError.message}`);
+      }
       
       if (!fileContents || fileContents.length === 0) {
-        throw new Error('Failed to extract file content');
+        throw new Error('No content extracted from file');
       }
 
       const content = fileContents[0];
       console.log(`📄 Extracted ${content.content.length} characters from ${file.name}`);
+      console.log('📄 Content preview:', content.content.substring(0, 200) + '...');
       
       // Set preview of content
       setFilePreview(content.content.substring(0, 500) + (content.content.length > 500 ? '...' : ''));

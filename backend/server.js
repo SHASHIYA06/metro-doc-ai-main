@@ -440,10 +440,25 @@ app.post("/ingest", upload.array("files"), async (req, res) => {
           console.log(`🔄 Processing chunk ${i + 1}/${chunks.length} for ${fileName} (${chunk.length} chars)`);
 
           try {
-            const embedding = await geminiEmbed(chunk);
-
-            if (embedding.length === 0) {
-              console.warn(`⚠️ Empty embedding for chunk ${i} of ${fileName}`);
+            let embedding;
+            try {
+              embedding = await geminiEmbed(chunk);
+              
+              if (embedding.length === 0) {
+                console.warn(`⚠️ Empty embedding for chunk ${i} of ${fileName}`);
+                continue;
+              }
+            } catch (embeddingError) {
+              console.error(`❌ Embedding error for chunk ${i} of ${fileName}:`, embeddingError.message);
+              
+              // Check if it's an API key issue
+              if (embeddingError.message.includes('API key not valid') || embeddingError.message.includes('GEMINI_API_KEY missing')) {
+                console.log('⚠️ Gemini API key issue detected - file processed but search will not work');
+                // Continue processing but skip embedding
+                continue;
+              }
+              
+              // For other errors, continue to next chunk
               continue;
             }
 
