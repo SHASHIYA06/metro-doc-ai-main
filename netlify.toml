@@ -1,38 +1,19 @@
-# Netlify configuration for KMRCL Metro Document Intelligence
-
 [build]
-  # Build command
-  command = "npm run build"
-  
-  # Directory to publish (Vite builds to 'dist' by default)
   publish = "dist"
-  
-  # Environment variables for build
-  environment = { NODE_VERSION = "18" }
+  command = "npm run build:prod"
 
-# Redirect rules for SPA (Single Page Application)
+[build.environment]
+  NODE_VERSION = "18"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Headers for security and performance
 [[headers]]
-  for = "/*"
+  for = "/static/*"
   [headers.values]
-    # Security headers
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    X-XSS-Protection = "1; mode=block"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    
-    # Performance headers
     Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/index.html"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/*.js"
@@ -43,22 +24,3 @@
   for = "/*.css"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
-
-# Environment-specific settings
-[context.production.environment]
-  VITE_API_BASE_URL = "https://metro-doc-ai-main.onrender.com"
-  VITE_APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzq7-DRXeX5dbcCAXfSqDgjubDAWkTiHOMdZ1PLaCdknrPkKfbo5znLvntYN7lICzz_mQ/exec"
-  VITE_ENABLE_DEBUG = "false"
-  VITE_ENABLE_ANALYTICS = "true"
-
-[context.deploy-preview.environment]
-  VITE_API_BASE_URL = "https://metro-doc-ai-main.onrender.com"
-  VITE_APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzq7-DRXeX5dbcCAXfSqDgjubDAWkTiHOMdZ1PLaCdknrPkKfbo5znLvntYN7lICzz_mQ/exec"
-  VITE_ENABLE_DEBUG = "true"
-  VITE_ENABLE_ANALYTICS = "false"
-
-[context.branch-deploy.environment]
-  VITE_API_BASE_URL = "https://metro-doc-ai-main.onrender.com"
-  VITE_APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzq7-DRXeX5dbcCAXfSqDgjubDAWkTiHOMdZ1PLaCdknrPkKfbo5znLvntYN7lICzz_mQ/exec"
-  VITE_ENABLE_DEBUG = "true"
-  VITE_ENABLE_ANALYTICS = "false"

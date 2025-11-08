@@ -13,7 +13,10 @@
     "deploy:netlify": "./scripts/deploy-netlify.sh",
     "test:connection": "curl -f http://localhost:3000/health || echo 'Backend not running'",
     "start:full": "concurrently \"cd backend && npm start\" \"npm run dev\"",
-    "build:check": "npm run build && npm run preview"
+    "build:check": "npm run build && npm run preview",
+    "init:data": "node scripts/load-comprehensive-data.js",
+    "start:production": "node scripts/start-application.js && npm run dev",
+    "test:search": "node scripts/test-file-specific-search-direct.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

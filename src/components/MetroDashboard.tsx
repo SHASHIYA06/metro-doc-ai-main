@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Upload, FileText, Download, Folder, ArrowLeft, CheckCircle, XCircle, Loader2, Settings, BarChart3, Database, Cloud, RefreshCw } from 'lucide-react';
+import { Search, Upload, FileText, Download, Folder, ArrowLeft, CheckCircle, XCircle, Loader2, Settings, BarChart3, Database, Cloud, RefreshCw, Bot } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { apiService } from '../services/api';
 import { googleDriveService } from '../services/googleDrive';
@@ -8,6 +8,7 @@ import { aiAnalysisService, AnalysisResult, SearchType } from '../services/aiAna
 import { Enhanced3DBackground } from './Enhanced3DBackground';
 import { StatusIndicator } from './StatusIndicator';
 import { config } from '../config/environment';
+import AISearchInterface from './AISearchInterface';
 
 // Types
 interface SearchResult {
@@ -49,11 +50,11 @@ interface BackendStats {
 }
 
 type ConnectionStatus = 'connecting' | 'connected' | 'error';
-type TabType = 'upload' | 'ai-search' | 'results' | 'drive' | 'stats';
+type TabType = 'ai-search-interface' | 'upload' | 'ai-search' | 'results' | 'drive' | 'stats';
 
 export const MetroDashboard: React.FC = () => {
   // State management
-  const [activeTab, setActiveTab] = useState<TabType>('upload');
+  const [activeTab, setActiveTab] = useState<TabType>('ai-search-interface');
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -1176,8 +1177,9 @@ Query: ${searchQuery}
         {/* Navigation Tabs */}
         <div className="flex flex-wrap justify-center gap-2 mb-8">
           {[
+            { id: 'ai-search-interface', label: '🤖 AI Search', icon: Bot },
             { id: 'upload', label: 'Upload', icon: Upload },
-            { id: 'ai-search', label: 'AI Search', icon: Search },
+            { id: 'ai-search', label: 'Legacy Search', icon: Search },
             { id: 'drive', label: 'Google Drive', icon: Cloud },
             { id: 'results', label: 'Results', icon: FileText },
             { id: 'stats', label: 'Statistics', icon: BarChart3 }
@@ -1196,6 +1198,11 @@ Query: ${searchQuery}
             </button>
           ))}
         </div>
+
+        {/* AI Search Interface Tab - NEW MAIN FEATURE */}
+        {activeTab === 'ai-search-interface' && (
+          <AISearchInterface />
+        )}
 
         {/* Main Content */}
         <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 shadow-2xl p-8">
