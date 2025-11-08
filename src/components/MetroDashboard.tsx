@@ -1469,11 +1469,9 @@ Query: ${searchQuery}
                     e.preventDefault();
                     e.stopPropagation();
                     
-                    console.log('🔥 BULLETPROOF TEST BUTTON CLICKED!');
-                    console.log('isProcessing:', isProcessing);
-                    console.log('config.API_BASE_URL:', config.API_BASE_URL);
-                    
-                    setIsProcessing(true);
+                    console.log('🚫 TEST DOCUMENT DISABLED - Use Google Drive files instead');
+                    toast.warning('🚫 Test document disabled. Please use Google Drive files for file-specific search.');
+                    return;
                     
                     (async () => {
                       try {
@@ -1580,14 +1578,10 @@ This comprehensive document contains all technical information for AI search tes
                       }
                     })();
                   }}
-                  className={`w-full px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 mb-3 font-bold text-lg ${
-                    isProcessing 
-                      ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                      : 'bg-green-600 text-white hover:bg-green-700 hover:shadow-xl active:scale-95'
-                  }`}
+                  className="w-full px-4 py-3 rounded-lg bg-gray-500 text-gray-300 cursor-not-allowed mb-3 font-bold text-lg flex items-center justify-center gap-2"
                 >
                   {isProcessing ? <Loader2 className="animate-spin" size={24} /> : <Settings size={24} />}
-                  {isProcessing ? 'PROCESSING...' : '🚀 CREATE & LOAD TEST DOCUMENT'}
+                  {isProcessing ? 'PROCESSING...' : '🚫 TEST DOCUMENT DISABLED (Use Google Drive files)'}
                 </button>
                 
                 {/* BULLETPROOF Google Drive File Loader */}
@@ -1903,9 +1897,9 @@ This comprehensive document contains all technical information for AI search tes
                   <div className="mt-2 p-2 bg-blue-600/20 rounded">
                     <p className="text-blue-200 text-xs font-medium">📋 HOW TO USE:</p>
                     <ol className="text-blue-300 text-xs mt-1 ml-4 space-y-1">
-                      <li>1️⃣ Click "CREATE & LOAD TEST DOCUMENT" to test (recommended first)</li>
-                      <li>2️⃣ Select your Google Drive files using checkboxes below</li>
-                      <li>3️⃣ Click "LOAD SELECTED FILES FOR AI SEARCH"</li>
+                      <li>1️⃣ Select your Google Drive files using checkboxes below</li>
+                      <li>2️⃣ Click "LOAD SELECTED FILES FOR AI SEARCH"</li>
+                      <li>3️⃣ Go to AI Search tab and ask questions about your files</li>
                       <li>4️⃣ Wait for automatic switch to AI Search tab</li>
                       <li>5️⃣ Ask questions about your documents!</li>
                     </ol>
