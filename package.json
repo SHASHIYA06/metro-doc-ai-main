@@ -16,7 +16,13 @@
     "build:check": "npm run build && npm run preview",
     "init:data": "node scripts/load-comprehensive-data.js",
     "start:production": "node scripts/start-application.js && npm run dev",
-    "test:search": "node scripts/test-file-specific-search-direct.js"
+    "test:search": "node scripts/test-file-specific-search-direct.js",
+    "test:google-drive": "node scripts/test-google-drive-integration.js",
+    "test:complete": "node scripts/test-complete-application.js",
+    "test:beml": "node scripts/test-beml-integration.js",
+    "upgrade:google-drive": "node scripts/upgrade-google-drive-integration.js",
+    "dev:enhanced": "VITE_ENABLE_ENHANCED_GOOGLE_DRIVE=true npm run dev",
+    "build:enhanced": "VITE_ENABLE_ENHANCED_GOOGLE_DRIVE=true npm run build:prod"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -1,5 +1,6 @@
-// Fixed Google Drive service with better error handling and debugging
-// This version includes comprehensive logging and fallback mechanisms
+// BEML Documents Google Drive Service - Enhanced for BEML DOCUMENTS folder
+// Author: SHASHI SHEKHAR MISHRA
+// Specifically designed for BEML DOCUMENTS folder access and upload functionality
 
 import { config } from '../config/environment';
 
@@ -24,15 +25,35 @@ export interface FileContent {
     name: string;
     content: string;
     mimeType: string;
+    extractedText?: string;
+    ocrText?: string;
+    metadata?: any;
+}
+
+export interface UploadResult {
+    success: boolean;
+    fileId?: string;
+    fileName?: string;
+    url?: string;
+    error?: string;
 }
 
 class GoogleDriveServiceFixed {
     private baseURL: string;
+    private sheetId: string;
+    private bemlFolderId: string = 'BEML_DOCUMENTS';
     private isInitialized: boolean = false;
+    private cache: Map<string, any> = new Map();
 
     constructor() {
-        this.baseURL = config.APP_SCRIPT_URL;
-        console.log('🔧 GoogleDriveServiceFixed initialized with URL:', this.baseURL);
+        // Use the correct Google Apps Script URL and Sheet ID for BEML DOCUMENTS
+        this.baseURL = 'https://script.google.com/macros/s/AKfycbzq7-DRXeX5dbcCAXfSqDgjubDAWkTiHOMdZ1PLaCdknrPkKfbo5znLvntYN7lICzz_mQ/exec';
+        this.sheetId = '1fUHu5fb5Z77Aq4cAiK4Zybq-Dpgjf0xlzEDsxIgT9m8';
+        
+        console.log('🚀 GoogleDriveServiceFixed initialized for BEML DOCUMENTS:');
+        console.log('   📍 Apps Script URL:', this.baseURL);
+        console.log('   📊 Sheet ID:', this.sheetId);
+        console.log('   📁 Target Folder: BEML DOCUMENTS');
     }
 
     // Initialize the service with better error handling
@@ -62,83 +83,78 @@ class GoogleDriveServiceFixed {
         }
     }
 
-    // Test connection with better error handling
+    // Enhanced connection test with proper Google Apps Script integration
     async testConnection(): Promise<boolean> {
         try {
             console.log('🔧 Testing Google Apps Script connection...');
+            console.log('📍 URL:', this.baseURL);
+            console.log('📊 Sheet ID:', this.sheetId);
 
             if (!this.baseURL || this.baseURL.includes('your_script_id')) {
                 console.log('⚠️ Google Apps Script URL not configured');
                 return false;
             }
 
-            const response = await fetch(`${this.baseURL}?action=listTree`, {
+            // Test with the correct endpoint and parameters
+            const testUrl = `${this.baseURL}?action=listTree&sheetId=${this.sheetId}`;
+            console.log('🔗 Testing URL:', testUrl);
+
+            const response = await fetch(testUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
                 }
             });
+
+            console.log('📡 Response status:', response.status);
+            console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const data = await response.json();
+            const responseText = await response.text();
+            console.log('📄 Raw response:', responseText.substring(0, 500));
+
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('❌ JSON parse error:', parseError);
+                console.log('📄 Response was not valid JSON:', responseText);
+                throw new Error('Invalid JSON response from Google Apps Script');
+            }
             
-            if (data.ok) {
+            if (data.ok || data.success) {
                 console.log('✅ Google Apps Script connection successful');
-                console.log(`Found ${data.folders?.length || 0} folders`);
+                console.log('📊 Response data:', data);
+                console.log(`📁 Found ${data.folders?.length || data.data?.length || 0} items`);
                 return true;
             } else {
-                throw new Error(data.error || 'Unknown error from Google Apps Script');
+                console.warn('⚠️ Google Apps Script returned error:', data);
+                throw new Error(data.error || data.message || 'Unknown error from Google Apps Script');
             }
         } catch (error) {
             console.error('❌ Google Drive connection test failed:', error);
+            console.log('🔄 Will continue with demo mode');
             return false;
         }
     }
 
-    // Load folder tree with fallback
+    // Enhanced folder tree loading with proper Google Sheet integration
     async loadTree(): Promise<DriveFolder[]> {
         try {
-            console.log('📁 Loading folder tree...');
+            console.log('📁 Loading folder tree from Google Sheet...');
+            console.log('📊 Using Sheet ID:', this.sheetId);
             
             if (!this.baseURL || this.baseURL.includes('your_script_id')) {
                 console.log('📁 Using demo folders (Google Apps Script not configured)');
                 return this.getDemoFolders();
             }
 
-            const resp = await fetch(`${this.baseURL}?action=listTree`);
-            const data = await resp.json();
-
-            if (!resp.ok || !data.ok) {
-                throw new Error(data.error || "Failed to fetch folders");
-            }
-
-            const folders = data.folders || [];
-            console.log('✅ Folders loaded successfully:', folders.length);
-            return folders;
-        } catch (err) {
-            console.error("❌ Failed to load tree, using demo folders:", err);
-            return this.getDemoFolders();
-        }
-    }
-
-    // Enhanced file loading with proper folder filtering
-    async listFiles(folderId: string = ""): Promise<DriveFile[]> {
-        try {
-            console.log('📄 Loading files for folder:', folderId || 'root');
-
-            if (!this.baseURL || this.baseURL.includes('your_script_id')) {
-                console.log('📄 Using demo files (Google Apps Script not configured)');
-                return this.getDemoFiles(folderId);
-            }
-
-            let url = `${this.baseURL}?action=listFiles`;
-            if (folderId && folderId !== 'root') {
-                url += `&folder=${encodeURIComponent(folderId)}`;
-                console.log('🎯 Fetching files from specific folder:', folderId);
-            }
+            const url = `${this.baseURL}?action=listTree&sheetId=${this.sheetId}`;
+            console.log('🔗 Fetching from:', url);
 
             const resp = await fetch(url, {
                 method: 'GET',
@@ -152,40 +168,132 @@ class GoogleDriveServiceFixed {
                 throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
             }
 
-            const data = await resp.json();
+            const responseText = await resp.text();
+            console.log('📄 Raw folder response:', responseText.substring(0, 300));
 
-            if (!data.ok) {
-                throw new Error(data.error || "Failed to fetch files");
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('❌ JSON parse error for folders:', parseError);
+                throw new Error('Invalid JSON response for folders');
             }
 
-            const files = data.files || [];
-            console.log('✅ Files loaded successfully:', files.length);
-            
-            // Validate that files are from the correct folder
-            if (folderId && folderId !== 'root') {
-                console.log(`🔍 Validating files are from folder: ${folderId}`);
-                // Add folder validation logic here if needed
+            if (data.ok || data.success) {
+                const folders = data.folders || data.data || [];
+                console.log('✅ Folders loaded successfully:', folders.length);
+                console.log('📁 Folder data:', folders);
+                return folders;
+            } else {
+                throw new Error(data.error || data.message || "Failed to fetch folders");
             }
-            
-            return files;
         } catch (err) {
-            console.error("❌ Failed to load files from folder:", folderId, err);
-            return this.getDemoFiles(folderId);
+            console.error("❌ Failed to load tree from Google Sheet, using demo folders:", err);
+            return this.getDemoFolders();
         }
     }
 
-    // Enhanced file content extraction with multiple fallbacks
+    // Enhanced file loading with proper Google Sheet integration
+    async listFiles(folderId: string = ""): Promise<DriveFile[]> {
+        try {
+            console.log('📄 Loading files from Google Sheet...');
+            console.log('📁 Folder ID:', folderId || 'root');
+            console.log('📊 Sheet ID:', this.sheetId);
+
+            if (!this.baseURL || this.baseURL.includes('your_script_id')) {
+                console.log('📄 Using demo files (Google Apps Script not configured)');
+                return this.getDemoFiles(folderId);
+            }
+
+            let url = `${this.baseURL}?action=listFiles&sheetId=${this.sheetId}`;
+            if (folderId && folderId !== 'root') {
+                url += `&folder=${encodeURIComponent(folderId)}`;
+                console.log('🎯 Fetching files from specific folder:', folderId);
+            }
+
+            console.log('🔗 Fetching files from:', url);
+
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            if (!resp.ok) {
+                throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+            }
+
+            const responseText = await resp.text();
+            console.log('📄 Raw files response:', responseText.substring(0, 500));
+
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('❌ JSON parse error for files:', parseError);
+                throw new Error('Invalid JSON response for files');
+            }
+
+            if (data.ok || data.success) {
+                const files = data.files || data.data || [];
+                console.log('✅ BEML files loaded successfully:', files.length);
+                console.log('📄 BEML files data sample:', files.slice(0, 3));
+                
+                // Filter and enhance BEML-related files
+                const bemlFiles = files.filter((file: any) => this.isBEMLRelatedFile(file));
+                
+                const enhancedFiles = bemlFiles.map((file: any) => ({
+                    id: file.id || file.fileId || `file_${Date.now()}_${Math.random()}`,
+                    name: file.name || file.fileName || 'Unknown File',
+                    mimeType: file.mimeType || file.type || 'application/octet-stream',
+                    type: file.type === 'folder' || file.mimeType?.includes('folder') ? 'folder' : 'file',
+                    size: file.size || file.fileSize,
+                    modifiedTime: file.modifiedTime || file.lastModified,
+                    url: file.url || file.webViewLink,
+                    path: file.path || this.buildFilePath(file)
+                }));
+                
+                console.log('📄 Enhanced BEML files:', enhancedFiles.length);
+                
+                // Cache the results
+                this.cache.set(cacheKey, enhancedFiles);
+                console.log('💾 Cached BEML file data for future use');
+                
+                return enhancedFiles;
+            } else {
+                throw new Error(data.error || data.message || "Failed to fetch BEML files");
+            }
+        } catch (err) {
+            console.error("❌ Failed to load BEML files from Google Sheet:", err);
+            console.log("🔄 Falling back to BEML demo files");
+            return this.getBEMLDemoFiles(folderId);
+        }
+    }
+
+    // Build file path for hierarchy
+    private buildFilePath(file: any): string {
+        if (file.path) return file.path;
+        if (file.parentName) {
+            return `${file.parentName}/${file.name || file.fileName}`;
+        }
+        return file.name || file.fileName || 'Unknown';
+    }
+
+    // Enhanced file content extraction with Google Sheet integration
     async extractFileContents(fileIds: string[]): Promise<FileContent[]> {
         if (fileIds.length === 0) {
             throw new Error("Please select at least one file.");
         }
 
-        console.log('📥 Extracting content from files:', fileIds);
+        console.log('📥 Extracting content from Google Sheet files:', fileIds);
+        console.log('📊 Using Sheet ID:', this.sheetId);
         const contents: FileContent[] = [];
 
         for (const fileId of fileIds) {
             try {
-                console.log('🔄 Processing file:', fileId);
+                console.log('🔄 Processing file from Google Sheet:', fileId);
 
                 // Check if we're in demo mode
                 if (!this.baseURL || this.baseURL.includes('your_script_id')) {
@@ -195,43 +303,84 @@ class GoogleDriveServiceFixed {
                     continue;
                 }
 
-                // Try to download from Google Drive
-                const resp = await fetch(`${this.baseURL}?action=downloadBase64&fileId=${encodeURIComponent(fileId)}`);
+                // Enhanced download with Google Sheet integration
+                const url = `${this.baseURL}?action=downloadBase64&fileId=${encodeURIComponent(fileId)}&sheetId=${this.sheetId}`;
+                console.log('🔗 Downloading from:', url);
+
+                const resp = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
                 
                 if (!resp.ok) {
                     throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
                 }
 
-                const data = await resp.json();
+                const responseText = await resp.text();
+                console.log('📄 Raw download response:', responseText.substring(0, 300));
 
-                if (!data.ok) {
-                    throw new Error(data.error || "Failed to download file");
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('❌ JSON parse error for file content:', parseError);
+                    throw new Error('Invalid JSON response for file content');
                 }
 
-                const file = data.file;
+                if (!data.ok && !data.success) {
+                    throw new Error(data.error || data.message || "Failed to download file");
+                }
+
+                const file = data.file || data.data || {};
                 let text = "";
-                const base64 = file.base64 || "";
-                const fileName = file.name || `file_${fileId}`;
-                const mimeType = file.mimeType || 'application/octet-stream';
+                const base64 = file.base64 || file.content || "";
+                const fileName = file.name || file.fileName || `file_${fileId}`;
+                const mimeType = file.mimeType || file.type || 'application/octet-stream';
 
                 console.log(`📄 Processing ${fileName} (${mimeType})`);
+                console.log(`📊 Content size: ${base64.length} chars`);
 
-                // Extract text based on file type
-                if (mimeType === "application/pdf") {
+                // Enhanced text extraction with Google Sheet data
+                if (file.extractedText) {
+                    // If Google Apps Script already extracted text
+                    text = file.extractedText;
+                    console.log('✅ Using pre-extracted text from Google Apps Script');
+                } else if (file.content && typeof file.content === 'string') {
+                    // Direct text content
+                    text = file.content;
+                    console.log('✅ Using direct text content');
+                } else if (mimeType === "application/pdf") {
                     text = await this.extractTextFromPDFBase64(base64);
                 } else if (/^image\//i.test(mimeType)) {
                     text = await this.extractTextFromImageBase64(base64);
                 } else if (mimeType.includes('document') || mimeType.includes('sheet')) {
                     // Google Docs/Sheets - try to get plain text
-                    text = file.content || this.decodeBase64Text(base64);
+                    text = this.decodeBase64Text(base64) || file.plainText || file.textContent || "";
                 } else {
                     // For other text-based files
-                    text = this.decodeBase64Text(base64) || file.content || `[Could not decode content for ${fileName}]`;
+                    text = this.decodeBase64Text(base64) || `[Could not decode content for ${fileName}]`;
                 }
 
+                // Enhanced content validation
                 if (!text || text.trim().length < 10) {
-                    console.warn(`⚠️ Minimal content extracted from ${fileName}, using demo content`);
-                    text = this.getDemoFileContent(fileId).content;
+                    console.warn(`⚠️ Minimal content extracted from ${fileName}`);
+                    
+                    // Try alternative extraction methods
+                    if (file.ocrText) {
+                        text = file.ocrText;
+                        console.log('✅ Using OCR text from Google Apps Script');
+                    } else if (file.description) {
+                        text = `File Description: ${file.description}\n\nFile Name: ${fileName}\nFile Type: ${mimeType}`;
+                        console.log('✅ Using file description as content');
+                    } else {
+                        // Use enhanced demo content
+                        const demoContent = this.getDemoFileContent(fileId);
+                        text = `${demoContent.content}\n\n[Note: This is enhanced demo content for ${fileName}]`;
+                        console.log('✅ Using enhanced demo content');
+                    }
                 }
 
                 contents.push({
@@ -244,14 +393,15 @@ class GoogleDriveServiceFixed {
             } catch (error) {
                 console.error(`❌ Error processing file ${fileId}:`, error);
                 
-                // Fallback to demo content
-                console.log(`🔄 Using demo content for file ${fileId}`);
+                // Enhanced fallback with Google Sheet context
+                console.log(`🔄 Using enhanced demo content for file ${fileId}`);
                 const demoContent = this.getDemoFileContent(fileId);
+                demoContent.content = `${demoContent.content}\n\n[Note: This file is from Google Sheet ID: ${this.sheetId}]\n[Error: ${error.message}]`;
                 contents.push(demoContent);
             }
         }
 
-        console.log(`✅ Extracted content from ${contents.length} files`);
+        console.log(`✅ Extracted content from ${contents.length} files from Google Sheet`);
         return contents;
     }
 
@@ -330,16 +480,109 @@ class GoogleDriveServiceFixed {
         }
     }
 
-    // Demo data for when Google Drive is not configured
+    // BEML-specific demo data
     private getDemoFolders(): DriveFolder[] {
         return [
-            { id: 'demo_technical', name: 'Technical Documents', count: 5 },
-            { id: 'demo_safety', name: 'Safety Procedures', count: 3 },
-            { id: 'demo_maintenance', name: 'Maintenance Manuals', count: 4 }
+            { 
+                id: 'beml_documents_root', 
+                name: 'BEML DOCUMENTS', 
+                count: 47
+            },
+            { 
+                id: 'beml_signalling', 
+                name: 'BEML DOCUMENTS/SIGNALLING', 
+                count: 1
+            },
+            { 
+                id: 'beml_maintenance', 
+                name: 'BEML DOCUMENTS/Maintenance service checklist', 
+                count: 1
+            },
+            { 
+                id: 'beml_service_ocr', 
+                name: 'BEML DOCUMENTS/Service Checklists with OCR', 
+                count: 6
+            },
+            { 
+                id: 'beml_bell_check', 
+                name: 'BEML DOCUMENTS/BELL CHECK', 
+                count: 26
+            },
+            { 
+                id: 'beml_pin_diagram', 
+                name: 'BEML DOCUMENTS/PIN DIAGRAM', 
+                count: 6
+            }
         ];
     }
 
+    private getBEMLDemoFiles(folderId?: string): DriveFile[] {
+        const bemlFiles = [
+            {
+                id: 'beml_fds_surge_report',
+                name: 'FDS SURGE VOLTAGE REPORT_SEP-0349-FDSSYS-F-10-9-V0-R00.pdf',
+                mimeType: 'application/pdf',
+                type: 'file' as const,
+                size: 2142760,
+                modifiedTime: '2025-08-28T12:25:46.000Z',
+                url: 'https://drive.google.com/file/d/1678DMU77sGh3aj8ZIajAmVQ1PO3B1E1A/view',
+                path: 'BEML DOCUMENTS/FDS SURGE VOLTAGE REPORT_SEP-0349-FDSSYS-F-10-9-V0-R00.pdf'
+            },
+            {
+                id: 'beml_b8_checklist',
+                name: 'B8 service checklists.pdf',
+                mimeType: 'application/pdf',
+                type: 'file' as const,
+                size: 2617142,
+                modifiedTime: '2025-08-21T07:54:34.139Z',
+                url: 'https://drive.google.com/file/d/1ZnrhiQOPTV8hFCqWLdoujwR-tsHu407p/view',
+                path: 'BEML DOCUMENTS/Service Checklists/B8 service checklists.pdf'
+            },
+            {
+                id: 'beml_b4_checklist',
+                name: 'B4 service checklists.pdf',
+                mimeType: 'application/pdf',
+                type: 'file' as const,
+                size: 872517,
+                modifiedTime: '2025-08-21T07:53:53.682Z',
+                url: 'https://drive.google.com/file/d/1yKEjGBGr2rhuzBtlRZ-kS_NfLxpz4McY/view',
+                path: 'BEML DOCUMENTS/Service Checklists/B4 service checklists.pdf'
+            },
+            {
+                id: 'beml_maintenance_manual',
+                name: 'BEML Maintenance Manual.pdf',
+                mimeType: 'application/pdf',
+                type: 'file' as const,
+                size: 5432100,
+                modifiedTime: '2025-08-20T10:30:00.000Z',
+                url: 'https://drive.google.com/file/d/beml_maintenance_manual/view',
+                path: 'BEML DOCUMENTS/Maintenance/BEML Maintenance Manual.pdf'
+            },
+            {
+                id: 'beml_technical_specs',
+                name: 'BEML Technical Specifications.docx',
+                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                type: 'file' as const,
+                size: 1234567,
+                modifiedTime: '2025-08-19T14:15:00.000Z',
+                url: 'https://drive.google.com/file/d/beml_technical_specs/view',
+                path: 'BEML DOCUMENTS/Technical/BEML Technical Specifications.docx'
+            }
+        ];
+
+        // Filter by folder if specified
+        if (folderId && folderId !== 'root') {
+            return bemlFiles.filter(file => file.path?.includes(folderId));
+        }
+
+        return bemlFiles;
+    }
+
     private getDemoFiles(folderId?: string): DriveFile[] {
+        return this.getBEMLDemoFiles(folderId);
+    }
+
+    private getOriginalDemoFiles(folderId?: string): DriveFile[] {
         // Return folder-specific demo files
         if (folderId === 'demo_technical') {
             return [
@@ -630,6 +873,146 @@ Specifications visible in diagram:
 - Temperature Range: -20°C to +60°C`;
     }
 
+    // Upload file to BEML DOCUMENTS folder
+    async uploadFileToBEML(
+        file: File,
+        targetFolder: string = '',
+        metadata: { system?: string; subsystem?: string; description?: string } = {}
+    ): Promise<UploadResult> {
+        try {
+            console.log('📤 Uploading file to BEML DOCUMENTS folder:', file.name);
+            console.log('📁 Target folder:', targetFolder || 'BEML DOCUMENTS root');
+            console.log('📊 File size:', file.size, 'bytes');
+
+            // Convert file to base64
+            const base64Data = await this.fileToBase64(file);
+            console.log('✅ File converted to base64:', base64Data.length, 'chars');
+
+            // Prepare upload data for BEML DOCUMENTS
+            const uploadData = {
+                action: 'uploadToBEML',
+                fileName: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                data: base64Data,
+                targetFolder: targetFolder || 'BEML DOCUMENTS',
+                sheetId: this.sheetId,
+                metadata: {
+                    ...metadata,
+                    uploadedBy: 'KMRCL Document Intelligence',
+                    uploadDate: new Date().toISOString(),
+                    fileSize: file.size,
+                    bemlDocument: true
+                },
+                timestamp: Date.now()
+            };
+
+            console.log('📤 Uploading to BEML DOCUMENTS via Google Apps Script...');
+            const response = await fetch(this.baseURL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(uploadData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Upload failed: HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('📤 BEML upload response:', result);
+
+            if (result.success || result.ok) {
+                console.log('✅ File uploaded successfully to BEML DOCUMENTS:', result.fileId);
+                
+                // Clear cache to refresh file listings
+                this.clearCache();
+                
+                return {
+                    success: true,
+                    fileId: result.fileId || result.id,
+                    fileName: file.name,
+                    url: result.url || result.webViewLink
+                };
+            } else {
+                throw new Error(result.error || result.message || 'Upload failed');
+            }
+        } catch (error) {
+            console.error('❌ Failed to upload file to BEML DOCUMENTS:', error);
+            return {
+                success: false,
+                error: `Failed to upload ${file.name} to BEML DOCUMENTS: ${error.message}`
+            };
+        }
+    }
+
+    // Convert file to base64
+    private fileToBase64(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl = reader.result as string;
+                const base64 = dataUrl.split(',')[1] || '';
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Clear cache
+    clearCache(): void {
+        this.cache.clear();
+        console.log('💾 BEML Google Drive service cache cleared');
+    }
+
+    // Check if file is BEML-related
+    private isBEMLRelatedFile(file: any): boolean {
+        const fileName = (file.name || file.fileName || '').toUpperCase();
+        const filePath = (file.path || '').toUpperCase();
+        
+        // Include files that are in BEML folders or have BEML-related names
+        return fileName.includes('BEML') || 
+               filePath.includes('BEML') ||
+               filePath.includes('DOCUMENTS') ||
+               fileName.includes('SERVICE') ||
+               fileName.includes('CHECKLIST') ||
+               fileName.includes('MAINTENANCE') ||
+               fileName.includes('TECHNICAL') ||
+               fileName.includes('MANUAL') ||
+               fileName.includes('SPECIFICATION');
+    }
+
+    // Search functionality for BEML documents
+    async searchBEMLFiles(
+        keyword: string = '',
+        system: string = '',
+        subsystem: string = ''
+    ): Promise<any[]> {
+        try {
+            const params = new URLSearchParams();
+            params.append('action', 'search');
+            params.append('sheetId', this.sheetId);
+            params.append('bemlSearch', 'true');
+            if (keyword) params.append('keyword', keyword);
+            if (system) params.append('system', system);
+            if (subsystem) params.append('subsystem', subsystem);
+
+            const url = `${this.baseURL}?${params.toString()}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'BEML search failed');
+            }
+
+            return data.results || [];
+        } catch (error) {
+            console.error('Failed to search BEML files:', error);
+            throw new Error('Failed to search files in BEML DOCUMENTS folder');
+        }
+    }
+
     // Legacy methods for compatibility
     async loadFiles(folderId: string = ""): Promise<DriveFile[]> {
         return this.listFiles(folderId);
@@ -643,7 +1026,7 @@ Specifications visible in diagram:
                 contentBase64: contents[0].content
             };
         }
-        throw new Error('Failed to download file');
+        throw new Error('Failed to download BEML document');
     }
 }
 

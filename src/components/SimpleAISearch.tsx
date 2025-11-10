@@ -73,6 +73,14 @@ export default function SimpleAISearch() {
     contentType: ''
   });
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [showUploadDialog, setShowUploadDialog] = useState<boolean>(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadMetadata, setUploadMetadata] = useState({
+    system: '',
+    subsystem: '',
+    description: ''
+  });
 
   // Initialize Google Drive connection
   useEffect(() => {
@@ -687,6 +695,54 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
     }
   };
 
+  // Handle file upload to BEML DOCUMENTS folder
+  const handleUploadToBEML = async () => {
+    if (!uploadFile) {
+      toast.error('Please select a file to upload');
+      return;
+    }
+
+    setIsUploading(true);
+    
+    try {
+      console.log('📤 Uploading file to BEML DOCUMENTS:', uploadFile.name);
+      
+      const result = await googleDriveService.uploadFileToBEML(
+        uploadFile,
+        currentFolder === 'root' ? '' : currentFolder,
+        uploadMetadata
+      );
+
+      if (result.success) {
+        toast.success(`✅ ${uploadFile.name} uploaded successfully to BEML DOCUMENTS!`);
+        
+        // Refresh file list
+        await loadDriveFiles(currentFolder);
+        
+        // Reset upload state
+        setShowUploadDialog(false);
+        setUploadFile(null);
+        setUploadMetadata({ system: '', subsystem: '', description: '' });
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(`❌ Upload failed: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Handle file selection for upload
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadFile(file);
+      console.log('📄 File selected for upload:', file.name, file.size, 'bytes');
+    }
+  };
+
   // Alternative upload method using JSON instead of FormData
   const uploadFileAlternative = async (content: string, fileName: string): Promise<boolean> => {
     try {
@@ -728,10 +784,10 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
         {/* Enhanced Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4">
-            🔍 Enhanced Google Drive AI Search
+            🔍 BEML DOCUMENTS AI Search & Upload
           </h1>
           <p className="text-blue-200 text-lg mb-4">
-            Connect to Google Drive, select any file, and search its contents with advanced AI
+            Access BEML DOCUMENTS folder, upload files, and search contents with advanced AI
           </p>
           
           {/* Status Bar */}
@@ -771,9 +827,16 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
             <div className="xl:col-span-1 bg-white/10 backdrop-blur-sm rounded-xl p-6 shadow-2xl">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-white">
-                  📁 Google Drive Files
+                  📁 BEML DOCUMENTS
                 </h2>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowUploadDialog(true)}
+                    className="p-2 text-green-300 hover:text-white hover:bg-green-700/30 rounded-lg transition-all"
+                    title="Upload to BEML DOCUMENTS"
+                  >
+                    <Upload size={16} />
+                  </button>
                   <button
                     onClick={() => loadDriveFiles(currentFolder)}
                     className="p-2 text-blue-300 hover:text-white hover:bg-blue-700/30 rounded-lg transition-all"
@@ -1235,6 +1298,96 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
             </div>
           )}
         </div>
+
+        {/* Upload Dialog */}
+        {showUploadDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold mb-4">📤 Upload to BEML DOCUMENTS</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Select File</label>
+                  <input
+                    type="file"
+                    onChange={handleFileSelect}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.tiff,.dwg,.dxf"
+                  />
+                  {uploadFile && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      Selected: {uploadFile.name} ({Math.round(uploadFile.size / 1024)} KB)
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">System</label>
+                  <input
+                    type="text"
+                    value={uploadMetadata.system}
+                    onChange={(e) => setUploadMetadata({...uploadMetadata, system: e.target.value})}
+                    placeholder="e.g., Door Control System"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Subsystem</label>
+                  <input
+                    type="text"
+                    value={uploadMetadata.subsystem}
+                    onChange={(e) => setUploadMetadata({...uploadMetadata, subsystem: e.target.value})}
+                    placeholder="e.g., Safety Systems"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Description</label>
+                  <textarea
+                    value={uploadMetadata.description}
+                    onChange={(e) => setUploadMetadata({...uploadMetadata, description: e.target.value})}
+                    placeholder="Brief description of the document..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowUploadDialog(false);
+                    setUploadFile(null);
+                    setUploadMetadata({ system: '', subsystem: '', description: '' });
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  disabled={isUploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUploadToBEML}
+                  disabled={!uploadFile || isUploading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      Upload to BEML
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
