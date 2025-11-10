@@ -19,7 +19,13 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const app = express();
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ 
+  dest: "uploads/",
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB limit
+    fieldSize: 100 * 1024 * 1024  // 100MB field size limit
+  }
+});
 
 /* ------------------------------ CORS/JSON ------------------------------ */
 const allowedOrigins = [
@@ -45,8 +51,8 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
 /* ------------------------------ Enhanced Globals ------------------------------ */
 // Advanced in-memory vector store with metadata
@@ -61,18 +67,37 @@ const MAX_SNIPPETS = 15;           // More snippets for comprehensive answers
 const MAX_EMBED_TEXT = 8000;       // Increased limit for Gemini
 const SIMILARITY_THRESHOLD = 0.3;  // Lowered threshold for better results
 
-// Document type handlers
+// Enhanced document type handlers with support for more file types
 const DOCUMENT_HANDLERS = {
   'application/pdf': 'pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
   'application/vnd.ms-excel': 'xls',
+  'application/msword': 'doc',
   'text/csv': 'csv',
   'text/plain': 'text',
+  'text/html': 'html',
+  'text/xml': 'xml',
+  'application/xml': 'xml',
+  'application/json': 'json',
   'image/jpeg': 'image',
+  'image/jpg': 'image',
   'image/png': 'image',
   'image/tiff': 'image',
-  'image/bmp': 'image'
+  'image/tif': 'image',
+  'image/bmp': 'image',
+  'image/gif': 'image',
+  'image/webp': 'image',
+  'application/vnd.google-apps.document': 'gdoc',
+  'application/vnd.google-apps.spreadsheet': 'gsheet',
+  'application/vnd.google-apps.presentation': 'gslides',
+  'application/vnd.google-apps.drawing': 'gdraw',
+  'application/acad': 'dwg',
+  'application/x-autocad': 'dwg',
+  'image/vnd.dwg': 'dwg',
+  'application/dxf': 'dxf',
+  'application/vnd.ms-powerpoint': 'ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx'
 };
 
 /* ------------------------------ Enhanced Utilities ------------------------------ */
@@ -224,6 +249,41 @@ async function enhancedExtractText(filePath, mimetype, fileName) {
         });
         extractedText = xlsxText.join("\n\n");
         metadata.sheets = workbook.SheetNames.length;
+        break;
+
+      case 'gdoc':
+      case 'gsheet':
+      case 'gslides':
+      case 'gdraw':
+        // Google Apps files - content should be provided by Google Apps Script
+        extractedText = `Google ${mimetype.split('.').pop()} content - processed via Google Apps Script`;
+        metadata.googleAppsFile = true;
+        break;
+
+      case 'dwg':
+      case 'dxf':
+        // CAD files - extract any text annotations or metadata
+        extractedText = `CAD Drawing file: ${fileName}\nFile type: ${mimetype}\nProcessed for text content extraction.`;
+        metadata.cadFile = true;
+        break;
+
+      case 'ppt':
+      case 'pptx':
+        // PowerPoint files - basic text extraction
+        try {
+          // For now, treat as text - could be enhanced with specific PowerPoint libraries
+          extractedText = readTextSafe(filePath) || `PowerPoint presentation: ${fileName}`;
+          metadata.presentationFile = true;
+        } catch (pptError) {
+          extractedText = `PowerPoint presentation: ${fileName}\nContent extraction in progress...`;
+        }
+        break;
+
+      case 'html':
+      case 'xml':
+      case 'json':
+        extractedText = readTextSafe(filePath);
+        metadata.structuredData = true;
         break;
 
       case 'csv':

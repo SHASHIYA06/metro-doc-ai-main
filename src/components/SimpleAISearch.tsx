@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Upload, FileText, Loader2, CheckCircle, AlertCircle, FolderOpen, File, RefreshCw, Download, Eye } from 'lucide-react';
+import { Search, Upload, FileText, Loader2, CheckCircle, AlertCircle, FolderOpen, File, RefreshCw, Download, Eye, Filter, FileDown, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { googleDriveServiceFixed as googleDriveService } from '../services/googleDriveFixed';
+import { exportService, ExportData } from '../services/exportService';
 
 interface DriveFile {
   id: string;
@@ -64,6 +65,14 @@ export default function SimpleAISearch() {
   const [backendStats, setBackendStats] = useState<any>(null);
   const [processingProgress, setProcessingProgress] = useState<string>('');
   const [filePreview, setFilePreview] = useState<string>('');
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState<boolean>(false);
+  const [searchFilters, setSearchFilters] = useState({
+    documentType: '',
+    diagramType: '',
+    wiringType: '',
+    contentType: ''
+  });
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // Initialize Google Drive connection
   useEffect(() => {
@@ -424,14 +433,33 @@ SUGGESTED QUERIES: ${generateSuggestedQueries(content.content, file.name)}`;
     try {
       console.log(`🔍 Searching in ${selectedFile.name} for: "${searchQuery}"`);
 
-      // Enhanced query processing
+      // Enhanced query processing with advanced filters
       let finalQuery = searchQuery.trim();
       const lowerQuery = searchQuery.toLowerCase();
+      
+      // Apply advanced search filters
+      if (searchFilters.documentType) {
+        finalQuery += ` focusing on ${searchFilters.documentType} documents`;
+      }
+      
+      if (searchFilters.diagramType) {
+        finalQuery += ` specifically looking for ${searchFilters.diagramType} diagrams`;
+      }
+      
+      if (searchFilters.wiringType) {
+        finalQuery += ` related to ${searchFilters.wiringType} wiring`;
+      }
+      
+      if (searchFilters.contentType) {
+        finalQuery += ` in ${searchFilters.contentType} content`;
+      }
       
       // Smart query enhancement based on content and context
       if (!lowerQuery.match(/^(what|how|describe|explain|list|show|find|tell)/)) {
         if (lowerQuery.includes('door')) {
           finalQuery = `What are the door system details and specifications related to "${searchQuery}"?`;
+        } else if (lowerQuery.includes('wiring') || lowerQuery.includes('diagram')) {
+          finalQuery = `What are the wiring diagram details and specifications for "${searchQuery}"?`;
         } else if (lowerQuery.includes('maintenance')) {
           finalQuery = `What are the maintenance procedures for "${searchQuery}"?`;
         } else if (lowerQuery.includes('safety')) {
@@ -445,7 +473,15 @@ SUGGESTED QUERIES: ${generateSuggestedQueries(content.content, file.name)}`;
         }
       }
 
-      console.log(`🔍 Enhanced query: "${finalQuery}"`);
+      // Add filter context to the query
+      if (Object.values(searchFilters).some(filter => filter)) {
+        finalQuery += ` [Advanced filters applied: ${Object.entries(searchFilters)
+          .filter(([_, value]) => value)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ')}]`;
+      }
+
+      console.log(`🔍 Enhanced query with filters: "${finalQuery}"`);
 
       // Search with file-specific filtering
       const searchResponse = await fetch(`${config.API_BASE_URL}/ask`, {
@@ -453,7 +489,7 @@ SUGGESTED QUERIES: ${generateSuggestedQueries(content.content, file.name)}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: finalQuery,
-          k: 8,
+          k: 10, // Increased for better results with filters
           system: `Selected File - ${selectedFile.name.split('.')[0]}`,
           subsystem: 'Google Drive Upload',
           tags: []
@@ -600,8 +636,55 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
     if (lowerQuery.includes('technical')) {
       suggestions.push('technical specifications', 'technical requirements', 'technical details');
     }
+    if (lowerQuery.includes('wiring')) {
+      suggestions.push('wiring diagrams', 'electrical connections', 'circuit details');
+    }
 
     return suggestions.slice(0, 6);
+  };
+
+  // Export search results
+  const handleExport = async (format: 'pdf' | 'excel' | 'word' | 'all') => {
+    if (!searchResults || searchResults.length === 0) {
+      toast.error('No search results to export');
+      return;
+    }
+
+    setIsExporting(true);
+    
+    try {
+      const exportData: ExportData = {
+        query: searchQuery,
+        results: searchResults,
+        timestamp: new Date().toLocaleString(),
+        selectedFile: selectedFile?.name,
+        totalResults: searchResults.length
+      };
+
+      switch (format) {
+        case 'pdf':
+          await exportService.exportToPDF(exportData);
+          toast.success('📄 Results exported to PDF');
+          break;
+        case 'excel':
+          await exportService.exportToExcel(exportData);
+          toast.success('📊 Results exported to Excel');
+          break;
+        case 'word':
+          await exportService.exportToWord(exportData);
+          toast.success('📝 Results exported to Word format');
+          break;
+        case 'all':
+          await exportService.exportAll(exportData);
+          toast.success('📦 Results exported in all formats');
+          break;
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error(`Export failed: ${error.message}`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Alternative upload method using JSON instead of FormData
@@ -877,6 +960,97 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
                 </div>
               </div>
 
+              {/* Advanced Search Filters */}
+              {selectedFile && isFileReady && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-white font-medium flex items-center gap-2">
+                      🔍 Advanced Search
+                    </h3>
+                    <button
+                      onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                      className="text-blue-300 hover:text-white text-sm flex items-center gap-1"
+                    >
+                      <Filter size={14} />
+                      {showAdvancedSearch ? 'Hide' : 'Show'} Filters
+                    </button>
+                  </div>
+                  
+                  {showAdvancedSearch && (
+                    <div className="bg-blue-800/30 rounded-lg p-4 border border-blue-600/30 mb-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-blue-200 text-xs mb-1 block">Document Type</label>
+                          <select
+                            value={searchFilters.documentType}
+                            onChange={(e) => setSearchFilters({...searchFilters, documentType: e.target.value})}
+                            className="w-full px-2 py-1 text-xs bg-blue-900/50 text-white rounded border border-blue-600/30"
+                          >
+                            <option value="">All Types</option>
+                            <option value="technical">Technical</option>
+                            <option value="safety">Safety</option>
+                            <option value="maintenance">Maintenance</option>
+                            <option value="operational">Operational</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="text-blue-200 text-xs mb-1 block">Diagram Type</label>
+                          <select
+                            value={searchFilters.diagramType}
+                            onChange={(e) => setSearchFilters({...searchFilters, diagramType: e.target.value})}
+                            className="w-full px-2 py-1 text-xs bg-blue-900/50 text-white rounded border border-blue-600/30"
+                          >
+                            <option value="">All Diagrams</option>
+                            <option value="wiring">Wiring Diagrams</option>
+                            <option value="schematic">Schematic</option>
+                            <option value="layout">Layout</option>
+                            <option value="flowchart">Flowchart</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="text-blue-200 text-xs mb-1 block">Wiring Type</label>
+                          <select
+                            value={searchFilters.wiringType}
+                            onChange={(e) => setSearchFilters({...searchFilters, wiringType: e.target.value})}
+                            className="w-full px-2 py-1 text-xs bg-blue-900/50 text-white rounded border border-blue-600/30"
+                          >
+                            <option value="">All Wiring</option>
+                            <option value="power">Power Wiring</option>
+                            <option value="control">Control Wiring</option>
+                            <option value="signal">Signal Wiring</option>
+                            <option value="communication">Communication</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="text-blue-200 text-xs mb-1 block">Content Type</label>
+                          <select
+                            value={searchFilters.contentType}
+                            onChange={(e) => setSearchFilters({...searchFilters, contentType: e.target.value})}
+                            className="w-full px-2 py-1 text-xs bg-blue-900/50 text-white rounded border border-blue-600/30"
+                          >
+                            <option value="">All Content</option>
+                            <option value="specifications">Specifications</option>
+                            <option value="procedures">Procedures</option>
+                            <option value="drawings">Drawings</option>
+                            <option value="tables">Tables/Data</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => setSearchFilters({documentType: '', diagramType: '', wiringType: '', contentType: ''})}
+                        className="mt-3 text-xs text-blue-300 hover:text-white"
+                      >
+                        Clear All Filters
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Enhanced Example Queries */}
               {selectedFile && isFileReady && (
                 <div className="mb-6">
@@ -887,7 +1061,7 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
                     {[
                       'What is the main content?',
                       'What are the key specifications?',
-                      'What are the procedures?',
+                      'What are the wiring details?',
                       'What are the technical requirements?',
                       'What are the safety guidelines?',
                       'What are the maintenance steps?'
@@ -912,11 +1086,67 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
                 <h2 className="text-2xl font-bold text-white">
                   📊 Search Results
                 </h2>
-                {searchResults.length > 0 && (
-                  <div className="text-sm text-blue-300">
-                    {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  {searchResults.length > 0 && (
+                    <>
+                      <div className="text-sm text-blue-300">
+                        {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+                      </div>
+                      
+                      {/* Export Dropdown */}
+                      <div className="relative group">
+                        <button
+                          disabled={isExporting}
+                          className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-all disabled:opacity-50"
+                        >
+                          {isExporting ? (
+                            <Loader2 className="animate-spin" size={14} />
+                          ) : (
+                            <Download size={14} />
+                          )}
+                          Export
+                        </button>
+                        
+                        {/* Export Options */}
+                        <div className="absolute right-0 top-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[150px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                          <button
+                            onClick={() => handleExport('pdf')}
+                            disabled={isExporting}
+                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
+                          >
+                            <FileTextIcon size={14} />
+                            Export PDF
+                          </button>
+                          <button
+                            onClick={() => handleExport('excel')}
+                            disabled={isExporting}
+                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
+                          >
+                            <FileSpreadsheet size={14} />
+                            Export Excel
+                          </button>
+                          <button
+                            onClick={() => handleExport('word')}
+                            disabled={isExporting}
+                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
+                          >
+                            <FileDown size={14} />
+                            Export Word
+                          </button>
+                          <hr className="my-1" />
+                          <button
+                            onClick={() => handleExport('all')}
+                            disabled={isExporting}
+                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm font-medium"
+                          >
+                            <Download size={14} />
+                            Export All
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Results Display */}
