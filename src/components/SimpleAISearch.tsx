@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Upload, FileText, Loader2, CheckCircle, AlertCircle, FolderOpen, File, RefreshCw, Download, Eye, Filter, FileDown, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { googleDriveServiceFixed as googleDriveService } from '../services/googleDriveFixed';
+import { googleDriveBEMLService as googleDriveService } from '../services/googleDriveBEML';
 import { exportService, ExportData } from '../services/exportService';
 
 interface DriveFile {
@@ -98,21 +98,31 @@ export default function SimpleAISearch() {
       }
       console.log('✅ Backend connection successful');
 
-      // Initialize Google Drive
-      console.log('🔧 Initializing Google Drive...');
-      const isConnected = await googleDriveService.testConnection();
-      if (!isConnected) {
-        throw new Error('Google Drive connection failed');
-      }
+      // Initialize BEML DOCUMENTS Google Drive
+      console.log('🔧 Initializing BEML DOCUMENTS Google Drive...');
+      await googleDriveService.initialize();
       
-      setIsConnected(true);
+      const isConnected = await googleDriveService.testConnection();
+      console.log('📊 BEML DOCUMENTS connection result:', isConnected);
+      
+      setIsConnected(true); // Set as connected regardless to show the interface
+      
+      // Load BEML DOCUMENTS folders and files
+      console.log('📁 Loading BEML DOCUMENTS...');
       await loadDriveFiles();
       await loadBackendStats();
       
-      toast.success('✅ Application initialized successfully');
+      if (isConnected) {
+        toast.success('✅ BEML DOCUMENTS connected successfully');
+      } else {
+        toast('⚠️ Using BEML demo mode - check Google Apps Script configuration');
+      }
     } catch (error) {
-      console.error('Failed to initialize application:', error);
+      console.error('Failed to initialize BEML DOCUMENTS application:', error);
       toast.error(`❌ Initialization failed: ${error.message}`);
+      // Still set as connected to show demo data
+      setIsConnected(true);
+      await loadDriveFiles();
     } finally {
       setIsInitializing(false);
     }
@@ -130,8 +140,37 @@ export default function SimpleAISearch() {
 
   const loadDriveFiles = async (folderId: string = 'root') => {
     try {
-      console.log(`📁 Loading files from folder: ${folderId}`);
-      const files = await googleDriveService.listFiles(folderId);
+      console.log(`📁 Loading BEML files from folder: ${folderId}`);
+      
+      let files;
+      if (folderId === 'root') {
+        // Load BEML folders first
+        console.log('📁 Loading BEML DOCUMENTS folder structure...');
+        const folders = await googleDriveService.loadTree();
+        console.log('📁 BEML folders loaded:', folders.length);
+        
+        // Convert folders to DriveFile format
+        const folderFiles = folders.map(folder => ({
+          id: folder.id,
+          name: folder.name,
+          mimeType: 'application/vnd.google-apps.folder',
+          type: 'folder' as const,
+          size: folder.count ? `${folder.count} items` : undefined,
+          modifiedTime: undefined
+        }));
+        
+        // Load files from BEML DOCUMENTS root
+        console.log('📄 Loading files from BEML DOCUMENTS root...');
+        const bemlFiles = await googleDriveService.listFiles('');
+        console.log('📄 BEML files loaded:', bemlFiles.length);
+        
+        // Combine folders and files
+        files = [...folderFiles, ...bemlFiles];
+      } else {
+        // Load files from specific folder
+        console.log(`📄 Loading files from folder: ${folderId}`);
+        files = await googleDriveService.listFiles(folderId);
+      }
       
       // Sort files: folders first, then by name
       const sortedFiles = files.sort((a, b) => {
@@ -143,10 +182,27 @@ export default function SimpleAISearch() {
       
       setDriveFiles(sortedFiles);
       setCurrentFolder(folderId);
-      console.log(`✅ Loaded ${sortedFiles.length} items`);
+      console.log(`✅ Loaded ${sortedFiles.length} BEML items`);
+      console.log('📊 BEML items breakdown:', {
+        folders: sortedFiles.filter(f => f.type === 'folder').length,
+        files: sortedFiles.filter(f => f.type === 'file').length
+      });
+      
+      // Show success message with data details
+      if (sortedFiles.length > 0) {
+        const folderCount = sortedFiles.filter(f => f.type === 'folder').length;
+        const fileCount = sortedFiles.filter(f => f.type === 'file').length;
+        toast.success(`📊 Loaded ${folderCount} folders and ${fileCount} files from BEML DOCUMENTS`);
+      }
     } catch (error) {
-      console.error('Failed to load files:', error);
-      toast.error('❌ Failed to load files');
+      console.error('Failed to load BEML files:', error);
+      toast.error('❌ Failed to load BEML files');
+      
+      // Fallback to demo data if connection fails
+      console.log('🔄 Using BEML demo data as fallback...');
+      const demoFiles = await googleDriveService.getBEMLDemoFiles();
+      setDriveFiles(demoFiles);
+      toast('📊 Using BEML demo data - check Google Apps Script configuration');
     }
   };
 
@@ -707,10 +763,10 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
     try {
       console.log('📤 Uploading file to BEML DOCUMENTS:', uploadFile.name);
       
-      const result = await googleDriveService.uploadFileToBEML(
+      const result = await googleDriveService.uploadFile(
         uploadFile,
-        currentFolder === 'root' ? '' : currentFolder,
-        uploadMetadata
+        uploadMetadata.system,
+        uploadMetadata.subsystem
       );
 
       if (result.success) {

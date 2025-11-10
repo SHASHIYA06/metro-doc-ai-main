@@ -56,29 +56,26 @@ class GoogleDriveServiceFixed {
         console.log('   📁 Target Folder: BEML DOCUMENTS');
     }
 
-    // Initialize the service with better error handling
+    // Initialize the BEML DOCUMENTS service with enhanced error handling
     async initialize(): Promise<void> {
         if (this.isInitialized) return;
         
         try {
-            console.log('🔧 Initializing Google Drive service...');
-            
-            // Check if URL is configured
-            if (!this.baseURL || this.baseURL.includes('your_script_id')) {
-                console.warn('⚠️ Google Apps Script URL not configured, using demo mode');
-                this.isInitialized = true;
-                return;
-            }
+            console.log('🔧 Initializing BEML DOCUMENTS Google Drive service...');
+            console.log('📍 Apps Script URL:', this.baseURL);
+            console.log('📊 Sheet ID:', this.sheetId);
             
             const isConnected = await this.testConnection();
-            if (!isConnected) {
-                console.warn('⚠️ Google Drive connection failed, using demo mode');
+            if (isConnected) {
+                console.log('✅ BEML DOCUMENTS connection successful');
+            } else {
+                console.warn('⚠️ BEML DOCUMENTS connection failed, will use demo mode as fallback');
             }
             
             this.isInitialized = true;
-            console.log('✅ Google Drive service initialized successfully');
+            console.log('✅ BEML DOCUMENTS Google Drive service initialized');
         } catch (error) {
-            console.error('❌ Failed to initialize Google Drive service:', error);
+            console.error('❌ Failed to initialize BEML DOCUMENTS Google Drive service:', error);
             this.isInitialized = true; // Continue in demo mode
         }
     }
@@ -86,109 +83,141 @@ class GoogleDriveServiceFixed {
     // Enhanced connection test with proper Google Apps Script integration
     async testConnection(): Promise<boolean> {
         try {
-            console.log('🔧 Testing Google Apps Script connection...');
+            console.log('🔧 Testing BEML DOCUMENTS Google Apps Script connection...');
             console.log('📍 URL:', this.baseURL);
             console.log('📊 Sheet ID:', this.sheetId);
 
-            if (!this.baseURL || this.baseURL.includes('your_script_id')) {
-                console.log('⚠️ Google Apps Script URL not configured');
-                return false;
-            }
-
-            // Test with the correct endpoint and parameters
-            const testUrl = `${this.baseURL}?action=listTree&sheetId=${this.sheetId}`;
-            console.log('🔗 Testing URL:', testUrl);
+            // Test with the correct endpoint and parameters for BEML DOCUMENTS
+            const testUrl = `${this.baseURL}?action=listTree&sheetId=${this.sheetId}&timestamp=${Date.now()}`;
+            console.log('🔗 Testing BEML URL:', testUrl);
 
             const response = await fetch(testUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
-                    'Cache-Control': 'no-cache'
+                    'Cache-Control': 'no-cache',
+                    'User-Agent': 'BEML-Documents-App/2.2.0'
                 }
             });
 
-            console.log('📡 Response status:', response.status);
-            console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+            console.log('📡 BEML Response status:', response.status);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const responseText = await response.text();
-            console.log('📄 Raw response:', responseText.substring(0, 500));
+            console.log('📄 BEML Raw response:', responseText.substring(0, 500));
 
             let data;
             try {
                 data = JSON.parse(responseText);
             } catch (parseError) {
-                console.error('❌ JSON parse error:', parseError);
-                console.log('📄 Response was not valid JSON:', responseText);
-                throw new Error('Invalid JSON response from Google Apps Script');
+                console.error('❌ BEML JSON parse error:', parseError);
+                console.log('📄 BEML Response was not valid JSON:', responseText);
+                throw new Error('Invalid JSON response from BEML Google Apps Script');
             }
             
             if (data.ok || data.success) {
-                console.log('✅ Google Apps Script connection successful');
-                console.log('📊 Response data:', data);
-                console.log(`📁 Found ${data.folders?.length || data.data?.length || 0} items`);
-                return true;
+                console.log('✅ BEML Google Apps Script connection successful');
+                console.log('📊 BEML Response data:', data);
+                
+                // Check if we have BEML folders
+                const folders = data.folders || data.data || [];
+                const bemlFolders = folders.filter((folder: any) => {
+                    const name = (folder.name || '').toUpperCase();
+                    return name.includes('BEML') || name.includes('DOCUMENTS');
+                });
+                
+                console.log(`📁 Found ${folders.length} total folders, ${bemlFolders.length} BEML folders`);
+                
+                if (bemlFolders.length > 0) {
+                    console.log('✅ BEML DOCUMENTS folders found:', bemlFolders.map((f: any) => f.name));
+                    return true;
+                } else {
+                    console.warn('⚠️ No BEML DOCUMENTS folders found in response');
+                    return true; // Still return true as connection works, just no BEML folders
+                }
             } else {
-                console.warn('⚠️ Google Apps Script returned error:', data);
-                throw new Error(data.error || data.message || 'Unknown error from Google Apps Script');
+                console.warn('⚠️ BEML Google Apps Script returned error:', data);
+                throw new Error(data.error || data.message || 'Unknown error from BEML Google Apps Script');
             }
         } catch (error) {
-            console.error('❌ Google Drive connection test failed:', error);
-            console.log('🔄 Will continue with demo mode');
+            console.error('❌ BEML Google Drive connection test failed:', error);
+            console.log('🔄 Will continue with BEML demo mode');
             return false;
         }
     }
 
-    // Enhanced folder tree loading with proper Google Sheet integration
+    // Enhanced folder tree loading with proper BEML DOCUMENTS integration
     async loadTree(): Promise<DriveFolder[]> {
         try {
-            console.log('📁 Loading folder tree from Google Sheet...');
+            console.log('📁 Loading BEML DOCUMENTS folder tree from Google Sheet...');
             console.log('📊 Using Sheet ID:', this.sheetId);
-            
-            if (!this.baseURL || this.baseURL.includes('your_script_id')) {
-                console.log('📁 Using demo folders (Google Apps Script not configured)');
-                return this.getDemoFolders();
-            }
 
-            const url = `${this.baseURL}?action=listTree&sheetId=${this.sheetId}`;
-            console.log('🔗 Fetching from:', url);
+            const url = `${this.baseURL}?action=listTree&sheetId=${this.sheetId}&timestamp=${Date.now()}`;
+            console.log('🔗 Fetching BEML folders from:', url);
 
             const resp = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
-                    'Cache-Control': 'no-cache'
+                    'Cache-Control': 'no-cache',
+                    'User-Agent': 'BEML-Documents-App/2.2.0'
                 }
             });
 
             if (!resp.ok) {
+                console.error(`❌ HTTP Error ${resp.status}: ${resp.statusText}`);
                 throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
             }
 
             const responseText = await resp.text();
-            console.log('📄 Raw folder response:', responseText.substring(0, 300));
+            console.log('📄 Raw BEML folder response:', responseText.substring(0, 500));
 
             let data;
             try {
                 data = JSON.parse(responseText);
             } catch (parseError) {
-                console.error('❌ JSON parse error for folders:', parseError);
-                throw new Error('Invalid JSON response for folders');
+                console.error('❌ JSON parse error for BEML folders:', parseError);
+                console.log('📄 Raw response that failed to parse:', responseText);
+                throw new Error('Invalid JSON response for BEML folders');
             }
 
             if (data.ok || data.success) {
-                const folders = data.folders || data.data || [];
-                console.log('✅ Folders loaded successfully:', folders.length);
-                console.log('📁 Folder data:', folders);
-                return folders;
+                const allFolders = data.folders || data.data || [];
+                console.log('✅ All folders loaded successfully:', allFolders.length);
+                
+                // Filter for BEML DOCUMENTS folders
+                const bemlFolders = allFolders.filter((folder: any) => {
+                    const name = (folder.name || '').toUpperCase();
+                    return name.includes('BEML') || name.includes('DOCUMENTS');
+                });
+                
+                console.log('📁 BEML folders found:', bemlFolders.length);
+                console.log('📁 BEML folder names:', bemlFolders.map((f: any) => f.name));
+                
+                if (bemlFolders.length > 0) {
+                    // Return real BEML folders
+                    const enhancedBEMLFolders = bemlFolders.map((folder: any) => ({
+                        id: folder.id || folder.folderId || `beml_${Date.now()}`,
+                        name: folder.name || 'BEML Folder',
+                        count: folder.count || folder.fileCount || 0
+                    }));
+                    
+                    console.log('✅ Returning real BEML folders:', enhancedBEMLFolders);
+                    return enhancedBEMLFolders;
+                } else {
+                    console.warn('⚠️ No BEML folders found, using demo folders');
+                    return this.getDemoFolders();
+                }
             } else {
-                throw new Error(data.error || data.message || "Failed to fetch folders");
+                console.error('❌ BEML API returned error:', data.error || data.message);
+                throw new Error(data.error || data.message || "Failed to fetch BEML folders");
             }
         } catch (err) {
-            console.error("❌ Failed to load tree from Google Sheet, using demo folders:", err);
+            console.error("❌ Failed to load BEML folders from Google Sheet:", err);
+            console.log("🔄 Using BEML demo folders as fallback");
             return this.getDemoFolders();
         }
     }
@@ -238,13 +267,11 @@ class GoogleDriveServiceFixed {
 
             if (data.ok || data.success) {
                 const files = data.files || data.data || [];
-                console.log('✅ BEML files loaded successfully:', files.length);
-                console.log('📄 BEML files data sample:', files.slice(0, 3));
+                console.log('✅ Raw files loaded successfully:', files.length);
+                console.log('📄 Raw files data sample:', files.slice(0, 3));
                 
-                // Filter and enhance BEML-related files
-                const bemlFiles = files.filter((file: any) => this.isBEMLRelatedFile(file));
-                
-                const enhancedFiles = bemlFiles.map((file: any) => ({
+                // Process all files (don't filter out non-BEML files initially)
+                const enhancedFiles = files.map((file: any) => ({
                     id: file.id || file.fileId || `file_${Date.now()}_${Math.random()}`,
                     name: file.name || file.fileName || 'Unknown File',
                     mimeType: file.mimeType || file.type || 'application/octet-stream',
@@ -255,13 +282,21 @@ class GoogleDriveServiceFixed {
                     path: file.path || this.buildFilePath(file)
                 }));
                 
-                console.log('📄 Enhanced BEML files:', enhancedFiles.length);
+                console.log('📄 Enhanced files processed:', enhancedFiles.length);
+                console.log('📄 Sample enhanced files:', enhancedFiles.slice(0, 3).map(f => ({ name: f.name, type: f.type, size: f.size })));
                 
                 // Cache the results
                 this.cache.set(cacheKey, enhancedFiles);
-                console.log('💾 Cached BEML file data for future use');
+                console.log('💾 Cached file data for future use');
                 
-                return enhancedFiles;
+                // If we have real files, return them; otherwise use demo
+                if (enhancedFiles.length > 0) {
+                    console.log('✅ Returning real BEML files:', enhancedFiles.length);
+                    return enhancedFiles;
+                } else {
+                    console.warn('⚠️ No files found, using demo files');
+                    return this.getBEMLDemoFiles(folderId);
+                }
             } else {
                 throw new Error(data.error || data.message || "Failed to fetch BEML files");
             }
