@@ -73,7 +73,6 @@ export default function SimpleAISearch() {
     contentType: ''
   });
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
   const [showUploadDialog, setShowUploadDialog] = useState<boolean>(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadMetadata, setUploadMetadata] = useState({
@@ -796,7 +795,7 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
   };
 
   // Handle file selection for upload
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setUploadFile(file);
@@ -1371,7 +1370,7 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
                   <label className="block text-sm font-medium mb-2">Select File</label>
                   <input
                     type="file"
-                    onChange={handleFileSelect}
+                    onChange={handleUploadFileSelect}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.tiff,.dwg,.dxf"
                   />
