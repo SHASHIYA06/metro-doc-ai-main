@@ -8,9 +8,9 @@
 console.log('🔍 TESTING BEML GOOGLE DRIVE INTEGRATION\n');
 console.log('='.repeat(60));
 
-// Test configuration
-const GOOGLE_APPS_SCRIPT_URL = process.env.VITE_APP_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzq7-DRXeX5dbcCAXfSqDgjubDAWkTiHAWkTiCdknrPkKfbo5znLvntYN7lICzz_mQ/exec';
-const GOOGLE_SHEET_ID = process.env.VITE_GOOGLE_SHEET_ID || '1fUHu5fb5Z77Aq4cAiK4Zybq-Dpgjf0xlzEDsxI0xm8';
+// Test configuration - Using your correct working URL
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby6XbPuA7XDjIbInBg8-CmBv1Ig7hy5-BuKq6q4ovSJfbDxz3JdkyK08Y9pUI4S2CiZ7A/exec';
+const GOOGLE_SHEET_ID = '1fUHu5fb5Z77Aq4cAiK4Zybq-Dpgjf0xlzEDsxI0xm8';
 
 async function testBEMLGoogleDriveIntegration() {
     console.log('📊 Configuration:');
