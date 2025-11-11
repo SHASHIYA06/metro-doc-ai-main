@@ -22,6 +22,7 @@
     "test:beml": "node scripts/test-beml-integration.js",
     "test:beml-fix": "node scripts/test-beml-simple.js",
     "test:final": "node scripts/final-application-test.js",
+    "test:beml-drive": "node scripts/test-beml-google-drive.js",
     "upgrade:google-drive": "node scripts/upgrade-google-drive-integration.js",
     "dev:enhanced": "VITE_ENABLE_ENHANCED_GOOGLE_DRIVE=true npm run dev",
     "build:enhanced": "VITE_ENABLE_ENHANCED_GOOGLE_DRIVE=true npm run build:prod"
