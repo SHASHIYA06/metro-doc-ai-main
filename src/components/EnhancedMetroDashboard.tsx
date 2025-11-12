@@ -54,33 +54,7 @@ export default function EnhancedMetroDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'files' | 'analytics' | 'settings'>('overview');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
-      {/* Enhanced Header */}
-      <div className="bg-white/10 backdrop-blur-sm border-b border-white/20">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <Database className="text-white" size={24} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">BEML Metro Intelligence</h1>
-                <p className="text-blue-200 text-sm">Advanced Document Management & AI Search Platform</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                System Online
-              </div>
-              <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">
-                <Settings size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>    
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">    
   {/* Navigation Tabs */}
       <div className="container mx-auto px-6 py-6">
         <div className="flex items-center gap-2 mb-8">

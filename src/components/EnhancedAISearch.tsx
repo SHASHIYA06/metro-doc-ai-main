@@ -628,21 +628,14 @@ export default function EnhancedAISearch() {
 • Use the advanced search filters
 • Check if the information exists in the selected files
 • Contact support if the problem persists`;
-  };  return (
+  };
+
+  return (
 
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-6 py-8">
-        {/* Enhanced Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-            <Microscope className="text-blue-400" size={40} />
-            Enhanced AI Search & Analysis
-          </h1>
-          <p className="text-blue-200 text-lg mb-4">
-            Advanced multi-file search with matrix/table support, diagram analysis, and architectural intelligence
-          </p>
-          
-          {/* Enhanced Status Bar */}
+        {/* Enhanced Status Bar */}
+        <div className="text-center mb-6">
           <div className="flex justify-center items-center gap-6 text-sm">
             <div className="flex items-center gap-2 bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">
               <Database size={16} />

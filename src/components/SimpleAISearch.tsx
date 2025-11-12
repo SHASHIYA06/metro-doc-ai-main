@@ -841,16 +841,8 @@ ${suggestions.map(s => `• ${s}`).join('\n')}
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Enhanced Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4">
-            🔍 BEML DOCUMENTS AI Search & Upload
-          </h1>
-          <p className="text-blue-200 text-lg mb-4">
-            Access BEML DOCUMENTS folder, upload files, and search contents with advanced AI
-          </p>
-          
-          {/* Status Bar */}
+        {/* Status Bar */}
+        <div className="text-center mb-6">
           <div className="flex justify-center items-center gap-6 text-sm">
             <div className={`flex items-center gap-2 ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
               {isConnected ? <CheckCircle size={16} /> : <AlertCircle size={16} />}

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import SimpleAISearch from "./components/SimpleAISearch";
 import EnhancedAISearch from "./components/EnhancedAISearch";
 import EnhancedMetroDashboard from "./components/EnhancedMetroDashboard";
+import NavigationHeader from "./components/NavigationHeader";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -13,8 +14,10 @@ const App = () => (
     <div className="min-h-screen relative overflow-hidden">
       <Toaster position="top-right" />
       <BrowserRouter>
+        <NavigationHeader />
         <Routes>
-          <Route path="/" element={<SimpleAISearch />} />
+          <Route path="/" element={<EnhancedAISearch />} />
+          <Route path="/simple" element={<SimpleAISearch />} />
           <Route path="/enhanced" element={<EnhancedAISearch />} />
           <Route path="/dashboard" element={<EnhancedMetroDashboard />} />
           <Route path="*" element={<NotFound />} />
