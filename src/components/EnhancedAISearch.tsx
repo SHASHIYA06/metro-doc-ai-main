@@ -210,8 +210,9 @@ export default function EnhancedAISearch() {
     } finally {
       setIsProcessing(false);
     }
-  };  // Enhanc
-ed AI search with matrix/table support
+  };
+
+  // Enhanced AI search with matrix/table support
   const handleEnhancedSearch = async () => {
     if (!searchQuery.trim()) {
       toast.error('Please enter a search query');
@@ -291,10 +292,10 @@ ed AI search with matrix/table support
         let aiResponse = searchData.result;
         
         // Detect and preserve table/matrix formatting
-        const hasTableData = this.detectTableFormat(aiResponse);
-        const hasMatrixData = this.detectMatrixFormat(aiResponse);
-        const hasDiagramInfo = this.detectDiagramContent(aiResponse);
-        const hasSpecifications = this.detectSpecifications(aiResponse);
+        const hasTableData = detectTableFormat(aiResponse);
+        const hasMatrixData = detectMatrixFormat(aiResponse);
+        const hasDiagramInfo = detectDiagramContent(aiResponse);
+        const hasSpecifications = detectSpecifications(aiResponse);
 
         // Format the response based on detected content
         let formattedResponse = aiResponse;
@@ -302,23 +303,23 @@ ed AI search with matrix/table support
         let metadata: any = {};
 
         if (hasTableData) {
-          const tableData = this.extractTableData(aiResponse);
-          formattedResponse = this.formatAsTable(aiResponse, tableData);
+          const tableData = extractTableData(aiResponse);
+          formattedResponse = formatAsTable(aiResponse, tableData);
           resultFormat = 'table';
           metadata.hasTable = true;
           metadata.tableData = tableData;
         } else if (hasMatrixData) {
-          const matrixData = this.extractMatrixData(aiResponse);
-          formattedResponse = this.formatAsMatrix(aiResponse, matrixData);
+          const matrixData = extractMatrixData(aiResponse);
+          formattedResponse = formatAsMatrix(aiResponse, matrixData);
           resultFormat = 'matrix';
           metadata.hasMatrix = true;
           metadata.matrixData = matrixData;
         } else if (hasSpecifications) {
-          formattedResponse = this.formatAsSpecification(aiResponse);
+          formattedResponse = formatAsSpecification(aiResponse);
           resultFormat = 'specification';
           metadata.hasSpecifications = true;
         } else if (hasDiagramInfo) {
-          formattedResponse = this.formatAsDiagram(aiResponse);
+          formattedResponse = formatAsDiagram(aiResponse);
           resultFormat = 'diagram';
           metadata.hasDiagram = true;
         }
@@ -331,7 +332,7 @@ ed AI search with matrix/table support
           subsystem: 'Multi-File Analysis',
           score: 1.0,
           format: resultFormat,
-          preview: this.generatePreview(formattedResponse, resultFormat),
+          preview: generatePreview(formattedResponse, resultFormat),
           sources: searchData.sources?.map((source: any) => ({
             fileName: source.fileName,
             score: source.score,
@@ -343,7 +344,7 @@ ed AI search with matrix/table support
         // Add enhanced source analysis
         if (searchData.sources && searchData.sources.length > 0) {
           searchData.sources.forEach((source: any, index: number) => {
-            const sourceFormat = this.detectSourceFormat(source.preview);
+            const sourceFormat = detectSourceFormat(source.preview);
             
             results.push({
               id: `enhanced_source_${index}`,
@@ -353,13 +354,13 @@ ed AI search with matrix/table support
               subsystem: `Chunk ${source.position + 1}`,
               score: source.score || 0.5,
               format: sourceFormat,
-              preview: this.generatePreview(source.preview, sourceFormat),
+              preview: generatePreview(source.preview, sourceFormat),
               sources: [{
                 fileName: source.fileName,
                 score: source.score || 0.5,
                 preview: source.preview || 'No preview available'
               }],
-              metadata: this.extractSourceMetadata(source.preview)
+              metadata: extractSourceMetadata(source.preview)
             });
           });
         }
@@ -370,7 +371,7 @@ ed AI search with matrix/table support
         results.push({
           id: 'no_results_enhanced',
           title: '🔍 No Results Found - Enhanced Search',
-          content: this.generateEnhancedNoResultsMessage(searchQuery, selectedFiles.length),
+          content: generateEnhancedNoResultsMessage(searchQuery, selectedFiles.length),
           system: 'Enhanced Search Help',
           subsystem: 'No Results',
           score: 0.5,
@@ -391,7 +392,7 @@ ed AI search with matrix/table support
       setSearchResults([{
         id: 'search_error_enhanced',
         title: '❌ Enhanced Search Error',
-        content: this.generateErrorMessage(error.message, selectedFiles.length),
+        content: generateErrorMessage(error.message, selectedFiles.length),
         system: 'Error Handler',
         subsystem: 'Enhanced Search Error',
         score: 0,
@@ -405,7 +406,7 @@ ed AI search with matrix/table support
   };
 
   // Helper methods for format detection and processing
-  private detectTableFormat = (content: string): boolean => {
+  const detectTableFormat = (content: string): boolean => {
     return /\|.*\|.*\|/.test(content) || 
            /┌.*┐/.test(content) || 
            /├.*┤/.test(content) ||
@@ -413,21 +414,21 @@ ed AI search with matrix/table support
            /\b(table|matrix|specification|parameter|value)\b/i.test(content);
   };
 
-  private detectMatrixFormat = (content: string): boolean => {
+  const detectMatrixFormat = (content: string): boolean => {
     return /\[.*\].*\[.*\]/.test(content) || 
            content.includes('matrix') ||
            /\d+\s*x\s*\d+/.test(content);
   };
 
-  private detectDiagramContent = (content: string): boolean => {
+  const detectDiagramContent = (content: string): boolean => {
     return /\b(diagram|drawing|schematic|blueprint|layout|architecture|design)\b/i.test(content);
   };
 
-  private detectSpecifications = (content: string): boolean => {
+  const detectSpecifications = (content: string): boolean => {
     return /\b(specification|spec|parameter|requirement|standard|tolerance)\b/i.test(content);
   };
 
-  private extractTableData = (content: string): any[][] => {
+  const extractTableData = (content: string): any[][] => {
     // Extract table data from formatted content
     const lines = content.split('\n');
     const tableData: any[][] = [];
@@ -444,7 +445,7 @@ ed AI search with matrix/table support
     return tableData;
   };
 
-  private extractMatrixData = (content: string): any[][] => {
+  const extractMatrixData = (content: string): any[][] => {
     // Extract matrix data from content
     const matrixPattern = /\[(.*?)\]/g;
     const matches = content.match(matrixPattern);
@@ -458,7 +459,7 @@ ed AI search with matrix/table support
     return [];
   };
 
-  private formatAsTable = (content: string, tableData: any[][]): string => {
+  const formatAsTable = (content: string, tableData: any[][]): string => {
     if (tableData.length === 0) return content;
     
     let formatted = content + '\n\n📊 ENHANCED TABLE VIEW:\n';
@@ -478,7 +479,7 @@ ed AI search with matrix/table support
     return formatted;
   };
 
-  private formatAsMatrix = (content: string, matrixData: any[][]): string => {
+  const formatAsMatrix = (content: string, matrixData: any[][]): string => {
     if (matrixData.length === 0) return content;
     
     let formatted = content + '\n\n🔢 ENHANCED MATRIX VIEW:\n';
@@ -492,7 +493,7 @@ ed AI search with matrix/table support
     return formatted;
   };
 
-  private formatAsSpecification = (content: string): string => {
+  const formatAsSpecification = (content: string): string => {
     let formatted = content + '\n\n📋 ENHANCED SPECIFICATION VIEW:\n';
     formatted += '═'.repeat(80) + '\n';
     
@@ -524,7 +525,7 @@ ed AI search with matrix/table support
     return formatted;
   };
 
-  private formatAsDiagram = (content: string): string => {
+  const formatAsDiagram = (content: string): string => {
     let formatted = content + '\n\n🎨 ENHANCED DIAGRAM ANALYSIS:\n';
     formatted += '═'.repeat(80) + '\n';
     
@@ -554,31 +555,31 @@ ed AI search with matrix/table support
     return formatted;
   };
 
-  private detectSourceFormat = (content: string): 'text' | 'table' | 'matrix' | 'diagram' | 'specification' => {
-    if (this.detectTableFormat(content)) return 'table';
-    if (this.detectMatrixFormat(content)) return 'matrix';
-    if (this.detectSpecifications(content)) return 'specification';
-    if (this.detectDiagramContent(content)) return 'diagram';
+  const detectSourceFormat = (content: string): 'text' | 'table' | 'matrix' | 'diagram' | 'specification' => {
+    if (detectTableFormat(content)) return 'table';
+    if (detectMatrixFormat(content)) return 'matrix';
+    if (detectSpecifications(content)) return 'specification';
+    if (detectDiagramContent(content)) return 'diagram';
     return 'text';
   };
 
-  private generatePreview = (content: string, format: string): string => {
+  const generatePreview = (content: string, format: string): string => {
     const maxLength = format === 'table' || format === 'matrix' ? 500 : 300;
     return content.substring(0, maxLength) + (content.length > maxLength ? '...' : '');
   };
 
-  private extractSourceMetadata = (content: string): any => {
+  const extractSourceMetadata = (content: string): any => {
     return {
-      hasTable: this.detectTableFormat(content),
-      hasMatrix: this.detectMatrixFormat(content),
-      hasDiagram: this.detectDiagramContent(content),
-      hasSpecifications: this.detectSpecifications(content),
+      hasTable: detectTableFormat(content),
+      hasMatrix: detectMatrixFormat(content),
+      hasDiagram: detectDiagramContent(content),
+      hasSpecifications: detectSpecifications(content),
       contentLength: content.length,
       wordCount: content.split(/\s+/).length
     };
   };
 
-  private generateEnhancedNoResultsMessage = (query: string, fileCount: number): string => {
+  const generateEnhancedNoResultsMessage = (query: string, fileCount: number): string => {
     return `No relevant information found for "${query}" in ${fileCount} selected files.
 
 🔍 ENHANCED SEARCH SUGGESTIONS:
@@ -607,7 +608,7 @@ ed AI search with matrix/table support
 🎯 TIP: Use the advanced filters to narrow down your search by document type, diagram type, or content format.`;
   };
 
-  private generateErrorMessage = (error: string, fileCount: number): string => {
+  const generateErrorMessage = (error: string, fileCount: number): string => {
     return `Enhanced search failed: ${error}
 
 🔧 TROUBLESHOOTING STEPS:
@@ -618,7 +619,7 @@ ed AI search with matrix/table support
 
 📊 TECHNICAL DETAILS:
 • Selected Files: ${fileCount}
-• Backend Status: ${this.backendStats?.totalChunks || 0} chunks indexed
+• Backend Status: ${backendStats?.totalChunks || 0} chunks indexed
 • Error Type: ${error}
 • Search Mode: Enhanced AI with format detection
 
