@@ -12,17 +12,24 @@ export default function NavigationHeader() {
   const navigationItems = [
     {
       path: '/',
-      label: 'Enhanced Search',
-      icon: Microscope,
-      description: 'Advanced AI search with matrix/table support',
-      color: 'from-blue-500 to-purple-600'
+      label: 'Fixed AI Search',
+      icon: Zap,
+      description: 'Fixed Google Drive integration with accurate file browsing',
+      color: 'from-green-500 to-blue-600'
     },
     {
       path: '/dashboard',
       label: 'Dashboard',
       icon: BarChart3,
       description: 'System monitoring and analytics',
-      color: 'from-green-500 to-blue-600'
+      color: 'from-purple-500 to-indigo-600'
+    },
+    {
+      path: '/enhanced',
+      label: 'Enhanced Search',
+      icon: Microscope,
+      description: 'Advanced AI search with matrix/table support',
+      color: 'from-blue-500 to-purple-600'
     },
     {
       path: '/simple',
