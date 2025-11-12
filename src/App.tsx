@@ -2,7 +2,8 @@ import { Toaster } from "react-hot-toast";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import SimpleAISearch from "./components/SimpleAISearch";
-// import { MetroDashboard } from "./components/MetroDashboard";
+import EnhancedAISearch from "./components/EnhancedAISearch";
+import EnhancedMetroDashboard from "./components/EnhancedMetroDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -14,7 +15,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<SimpleAISearch />} />
-          {/* <Route path="/admin" element={<MetroDashboard />} /> */}
+          <Route path="/enhanced" element={<EnhancedAISearch />} />
+          <Route path="/dashboard" element={<EnhancedMetroDashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
