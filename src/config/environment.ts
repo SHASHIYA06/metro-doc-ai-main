@@ -17,7 +17,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
     (isDevelopment 
       ? 'http://localhost:3000' 
-      : 'https://metro-doc-ai-main.onrender.com'
+      : 'https://metro-doc-ai-main-production.up.railway.app'
     );
 
   // Google Apps Script URL for Drive integration
